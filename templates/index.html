@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — RSS Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+  <div>
+    <h1 class="page-title mb-0">
+      <i class="bi bi-grid-fill text-accent me-2"></i>Dashboard
+    </h1>
+    <p class="small mb-0" style="color: #cbd5e1; font-weight: 400; opacity: 0.95;">
+      Monitoreo de feeds RSS activos &nbsp;|&nbsp; 
+      <i class="bi bi-clock-history me-1 text-accent"></i>Intervalo global: <strong>{{ global_cfg.check_interval or '60' }} min</strong> &nbsp;|&nbsp; 
+      <i class="bi bi-play-circle me-1 text-accent"></i>Próxima ejecución: <strong class="font-mono">{{ next_run }}</strong>
+    </p>
+  </div>
+  <div class="d-flex align-items-center gap-3">
+    <div class="text-end">
+      <div class="small mb-1" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #cbd5e1; font-weight: 500;">Archivos enviados</div>
+      <div class="d-flex gap-2">
+        <span class="badge text-light fw-medium py-1 px-2" title="Últimas 24 horas" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;">
+          Día: <strong class="text-accent">{{ stats.sent_day }}</strong>
+        </span>
+        <span class="badge text-light fw-medium py-1 px-2" title="Últimos 7 días" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;">
+          Semana: <strong class="text-accent">{{ stats.sent_week }}</strong>
+        </span>
+        <span class="badge text-light fw-medium py-1 px-2" title="Últimos 30 días" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;">
+          Mes: <strong class="text-accent">{{ stats.sent_month }}</strong>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Stats bar -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-rss"></i></div>
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-label">Total Feeds</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon text-success"><i class="bi bi-check-circle"></i></div>
+      <div class="stat-value">{{ stats.active }}</div>
+      <div class="stat-label">Activos</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon text-warning"><i class="bi bi-pause-circle"></i></div>
+      <div class="stat-value">{{ stats.inactive }}</div>
+      <div class="stat-label">Inactivos</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon text-danger"><i class="bi bi-exclamation-triangle"></i></div>
+      <div class="stat-value">{{ stats.error }}</div>
+      <div class="stat-label">Con Errores</div>
+    </div>
+  </div>
+</div>
+
+{% if not feeds %}
+<div class="empty-state">
+  <i class="bi bi-inbox display-3 text-muted"></i>
+  <p class="mt-3 text-muted">No hay feeds configurados.<br>
+    <a href="/feeds/new">Añade el primero</a>.
+  </p>
+</div>
+{% else %}
+<div class="row g-4">
+  <!-- Feeds table (Left Column) -->
+  <div class="col-xl-8 col-lg-12">
+    <div class="glass-card h-100">
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width:2.5rem"></th>
+              <th>Nombre</th>
+              <th class="d-none d-lg-table-cell">Último item</th>
+              <th class="d-none d-lg-table-cell">Última ejecución</th>
+              <th class="d-none d-xl-table-cell">Estado</th>
+              <th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for feed in feeds %}
+            <tr class="feed-row {% if not feed.enabled %}opacity-50{% endif %}">
+              <td>
+                <span class="status-dot {% if feed.enabled %}dot-on{% else %}dot-off{% endif %}"
+                      title="{{ 'Activo' if feed.enabled else 'Inactivo' }}"></span>
+              </td>
+              <td>
+                <div class="fw-semibold">{{ feed.name }}</div>
+                <small class="text-muted text-truncate d-block" style="max-width:260px">{{ feed.url }}</small>
+                {% if feed.last_error %}
+                <small class="text-danger">
+                  <i class="bi bi-exclamation-circle me-1"></i>{{ feed.last_error[:80] }}…
+                </small>
+                {% endif %}
+              </td>
+              <td class="d-none d-lg-table-cell text-muted small">{{ feed.last_pub_date | fmt_dt }}</td>
+              <td class="d-none d-lg-table-cell text-muted small">{{ feed.last_run | fmt_dt }}</td>
+              <td class="d-none d-xl-table-cell">
+                {% if feed.consecutive_errors >= 3 %}
+                  <span class="badge bg-danger"><i class="bi bi-x-octagon me-1"></i>Error x{{ feed.consecutive_errors }}</span>
+                {% elif feed.consecutive_errors > 0 %}
+                  <span class="badge bg-warning text-dark"><i class="bi bi-exclamation me-1"></i>Aviso x{{ feed.consecutive_errors }}</span>
+                {% elif feed.enabled %}
+                  <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>OK</span>
+                {% else %}
+                  <span class="badge bg-secondary">Desactivado</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <div class="btn-group btn-group-sm" id="actions-{{ feed.id }}">
+                  <a href="/feeds/{{ feed.id }}/edit" class="btn btn-action btn-edit" title="Editar">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <button class="btn btn-action btn-run" title="Ejecutar ahora" onclick="runFeedNow({{ feed.id }})">
+                    <i class="bi bi-play-fill icon-run"></i>
+                  </button>
+                  <button class="btn btn-action btn-delete" title="Eliminar"
+                          onclick="confirmDelete({{ feed.id }}, '{{ feed.name | e }}')">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Weekly Activity Chart (Right Column) -->
+  <div class="col-xl-4 col-lg-12">
+    <div class="glass-card h-100 p-4 d-flex flex-column justify-content-between">
+      <div>
+        <h6 class="section-label mb-3" style="text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; font-size: 0.78rem;">
+          <i class="bi bi-activity text-accent me-2"></i>Actividad Semanal
+        </h6>
+        <p class="text-light small opacity-75 mb-4">Número de archivos enviados combinados en los últimos 7 días.</p>
+      </div>
+      <div style="position: relative; height: 170px; width: 100%;">
+        <canvas id="weeklyChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Delete confirm modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content glass-modal">
+      <div class="modal-header border-0">
+        <h5 class="modal-title"><i class="bi bi-trash text-danger me-2"></i>Confirmar eliminación</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        ¿Seguro que quieres eliminar el feed <strong id="deleteFeedName"></strong>?
+        <p class="text-muted small mt-2 mb-0">Esta acción no se puede deshacer.</p>
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form id="deleteForm" method="post">
+          <button type="submit" class="btn btn-danger">Eliminar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .spinner-spin {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+  }
+  .btn-action {
+    background: transparent !important;
+    color: #94a3b8 !important;
+    border: 1px solid #475569 !important;
+    transition: all 0.15s ease-in-out !important;
+  }
+  .btn-action:hover {
+    color: #f1f5f9 !important;
+    background: rgba(255,255,255,0.08) !important;
+    border-color: #cbd5e1 !important;
+  }
+</style>
+<script>
+  function confirmDelete(id, name) {
+    document.getElementById('deleteFeedName').textContent = name;
+    document.getElementById('deleteForm').action = `/feeds/${id}/delete`;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+  }
+
+  async function runFeedNow(feedId) {
+    const container = document.getElementById(`actions-${feedId}`);
+    if (!container) return;
+
+    const btnEdit = container.querySelector('.btn-edit');
+    const btnRun = container.querySelector('.btn-run');
+    const btnDelete = container.querySelector('.btn-delete');
+    const iconRun = container.querySelector('.icon-run');
+
+    // Disable buttons
+    if (btnEdit) {
+      btnEdit.classList.add('disabled');
+      btnEdit.style.pointerEvents = 'none';
+    }
+    if (btnDelete) btnDelete.disabled = true;
+    if (btnRun) btnRun.disabled = true;
+
+    // Change play icon to spinning hourglass
+    if (iconRun) {
+      iconRun.className = 'bi bi-hourglass-split spinner-spin';
+    }
+
+    try {
+      const resp = await fetch(`/feeds/${feedId}/run`, {
+        method: 'POST'
+      });
+      if (resp.ok) {
+        // Reload to show new timestamp
+        window.location.reload();
+      } else {
+        alert('Error al ejecutar el feed.');
+        // Re-enable
+        if (btnEdit) {
+          btnEdit.classList.remove('disabled');
+          btnEdit.style.pointerEvents = 'auto';
+        }
+        if (btnDelete) btnDelete.disabled = false;
+        if (btnRun) btnRun.disabled = false;
+        if (iconRun) iconRun.className = 'bi bi-play-fill icon-run';
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error de red al ejecutar el feed.');
+      if (btnEdit) {
+        btnEdit.classList.remove('disabled');
+        btnEdit.style.pointerEvents = 'auto';
+      }
+      if (btnDelete) btnDelete.disabled = false;
+      if (btnRun) btnRun.disabled = false;
+      if (iconRun) iconRun.className = 'bi bi-play-fill icon-run';
+    }
+  }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Render weekly activity chart
+  const ctx = document.getElementById('weeklyChart');
+  if (ctx) {
+    const rawData = {{ stats.chart_data | tojson | safe }};
+    const labels = rawData.map(item => item.day);
+    const data = rawData.map(item => item.count);
+
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Archivos enviados',
+          data: data,
+          borderColor: '#06b6d4', // accent cyan
+          backgroundColor: 'rgba(6, 182, 212, 0.12)', // subtle cyan fill
+          borderWidth: 2.5,
+          pointBackgroundColor: '#06b6d4',
+          pointBorderColor: '#ffffff',
+          pointHoverRadius: 6,
+          pointRadius: 4,
+          tension: 0.35, // smooth curved line
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            titleColor: '#f8fafc',
+            bodyColor: '#06b6d4',
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            borderWidth: 1,
+            padding: 8,
+            displayColors: false,
+            callbacks: {
+              label: function(context) {
+                return `${context.parsed.y} archivos`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false
+            },
+            ticks: {
+              color: '#94a3b8',
+              font: {
+                size: 10,
+                weight: '500'
+              }
+            }
+          },
+          y: {
+            grid: {
+              color: 'rgba(255, 255, 255, 0.05)',
+              drawTicks: false
+            },
+            ticks: {
+              color: '#94a3b8',
+              stepSize: 1,
+              font: {
+                size: 10
+              }
+            },
+            min: 0
+          }
+        }
+      }
+    });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Configuración Global — RSS Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="/" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h1 class="page-title mb-0">
+      <i class="bi bi-gear-fill text-accent me-2"></i>Configuración Global
+    </h1>
+    <p class="text-muted small mb-0">Credenciales de Telegram por defecto</p>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- COLUMN 1: CONFIGURATION FORM -->
+  <div class="col-lg-6">
+    <div class="glass-card p-4">
+      <div class="mb-3 d-flex align-items-center gap-2">
+        <i class="bi bi-telegram fs-3 text-accent"></i>
+        <div>
+          <h6 class="mb-0 fw-semibold">Bot de Telegram y Opciones</h6>
+          <small class="text-muted">Configuración global del bot y del intervalo de sincronización</small>
+        </div>
+      </div>
+      <hr class="border-secondary" />
+      <form action="/config" method="post">
+        <div class="mb-4">
+          <label for="telegram_token" class="form-label">Bot Token</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-key-fill"></i></span>
+            <input type="password" class="form-control font-mono" id="telegram_token" name="telegram_token"
+                   value="{{ global_cfg.telegram_token or '' }}"
+                   placeholder="123456789:ABCdefGHI..." autocomplete="off" />
+            <button class="btn btn-outline-secondary" type="button" id="btnShowToken"
+                    onclick="toggleVisibility('telegram_token', this)">
+              <i class="bi bi-eye"></i>
+            </button>
+          </div>
+          <div class="form-text">
+            Obtén tu token con <a href="https://t.me/BotFather" target="_blank">@BotFather</a>.
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label for="chat_id" class="form-label">Chat ID</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-hash"></i></span>
+            <input type="text" class="form-control font-mono" id="chat_id" name="chat_id"
+                   value="{{ global_cfg.chat_id or '' }}"
+                   placeholder="-1001234567890" />
+          </div>
+          <div class="form-text">
+            Para grupos usa el ID negativo (ej: <code>-100…</code>).
+            Puedes obtenerlo con <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a>.
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label for="check_interval" class="form-label">Intervalo de chequeo global (minutos)</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-clock-history"></i></span>
+            <input type="number" class="form-control" id="check_interval" name="check_interval"
+                   value="{{ global_cfg.check_interval or '60' }}" min="1" max="10080" required />
+            <span class="input-group-text">minutos</span>
+          </div>
+          <div class="form-text">
+            Tiempo entre chequeos para todos los feeds. Mínimo 1 min. Recomendado: 30–120 min.
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label for="max_items_per_message" class="form-label">Elementos máximos por mensaje de Telegram</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-list-ol"></i></span>
+            <input type="number" class="form-control" id="max_items_per_message" name="max_items_per_message"
+                   value="{{ global_cfg.max_items_per_message or '100' }}" min="1" max="500" required />
+            <span class="input-group-text">elementos</span>
+          </div>
+          <div class="form-text">
+            Límite de elementos combinados por mensaje enviado a Telegram para evitar saturación de la API.
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label">Modo nocturno silencioso (Telegram)</label>
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="input-group">
+                <span class="input-group-text small">Inicio</span>
+                <input type="time" class="form-control" id="silent_mode_start" name="silent_mode_start"
+                       value="{{ global_cfg.silent_mode_start or '' }}" />
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="input-group">
+                <span class="input-group-text small">Fin</span>
+                <input type="time" class="form-control" id="silent_mode_end" name="silent_mode_end"
+                       value="{{ global_cfg.silent_mode_end or '' }}" />
+              </div>
+            </div>
+          </div>
+          <div class="form-text">
+            Durante este rango de horas, los mensajes combinados se enviarán de forma silenciosa (sin sonido ni vibración). Déjalo vacío para desactivar.
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="run_on_startup" name="run_on_startup"
+                   value="true" {{ 'checked' if global_cfg.run_on_startup == 'true' else '' }} />
+            <label class="form-check-label fw-semibold" for="run_on_startup">Actualizar feeds al arrancar la aplicación</label>
+          </div>
+          <div class="form-text">
+            Si está activado, la aplicación forzará un chequeo completo de todos los feeds RSS inmediatamente al iniciarse el contenedor.
+          </div>
+        </div>
+
+        <!-- Quick Telegram test -->
+        <div class="mb-4">
+          <button type="button" class="btn btn-outline-accent w-100" id="btnTestTelegram">
+            <i class="bi bi-send me-2"></i>Enviar mensaje de prueba
+          </button>
+          <div id="testResult" class="mt-2 small d-none"></div>
+        </div>
+
+        <div class="d-grid">
+          <button type="submit" class="btn btn-accent btn-glow">
+            <i class="bi bi-floppy me-2"></i>Guardar configuración
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- COLUMN 2: BACKUPS -->
+  <div class="col-lg-6">
+    <div class="glass-card p-4">
+      <div class="mb-2 d-flex align-items-center gap-2">
+        <i class="bi bi-database-fill-gear fs-4 text-accent"></i>
+        <div>
+          <h6 class="mb-0 fw-semibold">Copias de seguridad</h6>
+          <small class="text-light opacity-75">Respaldo y restauración de la base de datos</small>
+        </div>
+      </div>
+      <hr class="border-secondary my-2" />
+
+      <!-- Export database -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold mb-1">Exportar base de datos</label>
+        <p class="text-light small mb-2 opacity-90">
+          Descarga un respaldo completo (<code>rsstracker.db</code>) con todos tus feeds, configuraciones e historial de envíos.
+        </p>
+        <a href="/config/backup" class="btn btn-outline-accent btn-sm w-100">
+          <i class="bi bi-download me-2"></i>Descargar copia de seguridad
+        </a>
+      </div>
+
+      <!-- Import database -->
+      <div class="mb-0">
+        <label class="form-label fw-semibold mb-1">Restaurar copia de seguridad</label>
+        <p class="text-light small mb-2 opacity-90">
+          Sube un archivo SQLite (<code>.db</code>) para reemplazar y restaurar los datos actuales.
+        </p>
+        <form action="/config/restore" method="post" enctype="multipart/form-data" onsubmit="return confirm('¿Estás seguro de que deseas sobrescribir la base de datos? Se perderán todos los datos actuales.');">
+          <div class="mb-2">
+            <input class="form-control form-control-sm" type="file" id="db_file" name="db_file" accept=".db" required />
+          </div>
+          <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+            <i class="bi bi-upload me-2"></i>Restaurar base de datos
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    btn.innerHTML = isPassword ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+  }
+
+  document.getElementById('btnTestTelegram').addEventListener('click', async () => {
+    const token = document.getElementById('telegram_token').value.trim();
+    const chatId = document.getElementById('chat_id').value.trim();
+    const resultDiv = document.getElementById('testResult');
+
+    if (!token || !chatId) {
+      resultDiv.className = 'mt-2 small text-warning';
+      resultDiv.textContent = '⚠️ Rellena el token y el chat ID antes de probar.';
+      resultDiv.classList.remove('d-none');
+      return;
+    }
+
+    resultDiv.className = 'mt-2 small text-muted';
+    resultDiv.textContent = 'Enviando…';
+    resultDiv.classList.remove('d-none');
+
+    try {
+      const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: '✅ *RSS Tracker* — Conexión con Telegram confirmada.',
+          parse_mode: 'Markdown',
+        }),
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        resultDiv.className = 'mt-2 small text-success';
+        resultDiv.textContent = '✅ Mensaje enviado correctamente.';
+      } else {
+        resultDiv.className = 'mt-2 small text-danger';
+        resultDiv.textContent = '❌ Error: ' + (data.description || JSON.stringify(data));
+      }
+    } catch (err) {
+      resultDiv.className = 'mt-2 small text-danger';
+      resultDiv.textContent = '❌ Error de red: ' + err.message;
+    }
+  });
+</script>
+{% endblock %}

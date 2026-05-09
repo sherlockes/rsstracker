@@ -1,0 +1,20 @@
+services:
+  rsstracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      network: host          # Usa la red del host durante el build
+    container_name: rsstracker2telegram
+    restart: unless-stopped
+    ports:
+      - "8765:8000"
+    volumes:
+      - ./data:/app/data     # SQLite DB persisted on host
+    environment:
+      - TZ=Europe/Madrid
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
