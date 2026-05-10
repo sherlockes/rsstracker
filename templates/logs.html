@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Registros del Sistema - RSS Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="page-title mb-1"><i class="bi bi-terminal-fill text-accent me-2"></i>Registros del Sistema</h1>
+    <p class="text-muted mb-0">Últimas {{ lines }} líneas del archivo de depuración.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <form action="/logs" method="GET" class="d-flex gap-2">
+        <select name="lines" class="form-select form-select-sm" style="width: 120px;" onchange="this.form.submit()">
+            <option value="100" {% if lines == 100 %}selected{% endif %}>100 líneas</option>
+            <option value="500" {% if lines == 500 %}selected{% endif %}>500 líneas</option>
+            <option value="1000" {% if lines == 1000 %}selected{% endif %}>1000 líneas</option>
+            <option value="2000" {% if lines == 2000 %}selected{% endif %}>2000 líneas</option>
+        </select>
+    </form>
+    <button class="btn btn-sm btn-outline-secondary" onclick="window.location.reload()">
+        <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+    </button>
+    <form action="/logs/clear" method="POST" onsubmit="return confirm('¿Estás seguro de que quieres vaciar los registros?');">
+        <button type="submit" class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-trash3 me-1"></i>Limpiar
+        </button>
+    </form>
+  </div>
+</div>
+
+<div class="glass-card p-0 overflow-hidden">
+    <div class="bg-black p-3" style="background: #0a0e1a !important;">
+        <div class="log-container" id="log-box" style="height: calc(100vh - 280px); min-height: 400px; overflow-y: auto; overflow-x: auto;">
+            <pre class="mb-0 font-mono text-light" style="font-size: 0.8rem; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word;">{{ log_content | forceescape }}</pre>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Auto-scroll to the bottom of logs
+        const logBox = document.getElementById('log-box');
+        logBox.scrollTop = logBox.scrollHeight;
+
+        // Colorize levels
+        const pre = logBox.querySelector('pre');
+        if (pre) {
+            let html = pre.innerHTML;
+            // Highlight keywords
+            html = html.replace(/\[INFO\]/g, '<span style="color: #22d3ee; font-weight: bold;">[INFO]</span>');
+            html = html.replace(/\[WARNING\]/g, '<span style="color: #fb923c; font-weight: bold;">[WARNING]</span>');
+            html = html.replace(/\[ERROR\]/g, '<span style="color: #f87171; font-weight: bold;">[ERROR]</span>');
+            html = html.replace(/\[CRITICAL\]/g, '<span style="color: #f87171; background: rgba(248,113,113,0.2); font-weight: bold;">[CRITICAL]</span>');
+            
+            // Highlight dates if needed (approximate)
+            html = html.replace(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})/gm, '<span style="color: #64748b;">$1</span>');
+            
+            pre.innerHTML = html;
+        }
+    });
+</script>
+{% endblock %}

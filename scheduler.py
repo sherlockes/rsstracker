@@ -107,6 +107,7 @@ def run_feed_now(feed_id: int) -> None:
         try:
             entries = _fetch_rss(feed.url)
         except Exception as exc:
+            logger.exception("RSS fetch failed for feed '%s'", feed.name)
             _handle_feed_error(db, feed, token, chat_id, f"RSS fetch error: {exc}")
             return
 
@@ -120,7 +121,7 @@ def run_feed_now(feed_id: int) -> None:
 
         new_entries = []
         for entry in reversed(entries):
-            link = entry.get("link") or entry.get("title", "")
+            link = _get_final_link(entry, feed)
             if link not in sent_links:
                 new_entries.append(entry)
 
@@ -152,10 +153,15 @@ def run_feed_now(feed_id: int) -> None:
                         logger.error("Failed to send manual combined Telegram message: %s", exc)
 
             for entry, _ in feed_new_messages:
-                link = entry.get("link") or entry.get("title", "")
-                db.add(SentItem(feed_id=feed.id, link=link))
+                link = _get_final_link(entry, feed)
+                title = _clean_title(entry.get("title", "Sin título"), feed.title_regex_clean)
+                title = _transform_title(title, feed.title_transform_regex, feed.title_transform_replace)
+                db.add(SentItem(feed_id=feed.id, link=link, title=title))
 
             newest_date = feed.last_pub_date
+            if newest_date and newest_date.tzinfo is None:
+                newest_date = newest_date.replace(tzinfo=timezone.utc)
+
             for entry, _ in feed_new_messages:
                 pub = _parse_published(entry)
                 if pub and (newest_date is None or pub > newest_date):
@@ -210,6 +216,7 @@ def run_all_feeds_job() -> None:
             try:
                 entries = _fetch_rss(feed.url)
             except Exception as exc:
+                logger.exception("RSS fetch failed in global job for feed '%s'", feed.name)
                 _handle_feed_error(db, feed, token, chat_id, f"RSS fetch error: {exc}", send_alert=False)
                 feed_errors.append(f"Feed '{feed.name}': RSS fetch error: {exc}")
                 continue
@@ -224,7 +231,7 @@ def run_all_feeds_job() -> None:
 
             new_entries = []
             for entry in reversed(entries):
-                link = entry.get("link") or entry.get("title", "")
+                link = _get_final_link(entry, feed)
                 if link not in sent_links:
                     new_entries.append(entry)
 
@@ -244,11 +251,16 @@ def run_all_feeds_job() -> None:
                 for entry, msg in feed_new_messages:
                     all_new_item_messages.append(msg)
                     # Record this item as sent
-                    link = entry.get("link") or entry.get("title", "")
-                    db.add(SentItem(feed_id=feed.id, link=link))
+                    link = _get_final_link(entry, feed)
+                    title = _clean_title(entry.get("title", "Sin título"), feed.title_regex_clean)
+                    title = _transform_title(title, feed.title_transform_regex, feed.title_transform_replace)
+                    db.add(SentItem(feed_id=feed.id, link=link, title=title))
 
                 # Update last pub date
                 newest_date = feed.last_pub_date
+                if newest_date and newest_date.tzinfo is None:
+                    newest_date = newest_date.replace(tzinfo=timezone.utc)
+
                 for entry, _ in feed_new_messages:
                     pub = _parse_published(entry)
                     if pub and (newest_date is None or pub > newest_date):
@@ -280,18 +292,28 @@ def run_all_feeds_job() -> None:
                 if feed.consecutive_errors >= 3:
                     _send_telegram_alert(token, chat_id, feed.name, feed.last_error or "Unknown error")
 
-        # Keep SentItem count capped at 100 per feed
-        for feed in feeds:
-            excess = (
-                db.query(SentItem)
-                .filter(SentItem.feed_id == feed.id)
+        # Keep global SentItem count capped to configurable limit
+        try:
+            raw_limit = global_cfg.get("history_limit_total", "10000")
+            total_limit = int(raw_limit) if str(raw_limit).isdigit() else 10000
+            
+            # Subquery to find the IDs that we should DELETE
+            # (everything beyond the newest N elements)
+            excess_ids = (
+                db.query(SentItem.id)
                 .order_by(SentItem.id.desc())
-                .offset(100)
+                .offset(total_limit)
                 .all()
             )
-            for old_item in excess:
-                db.delete(old_item)
-        db.commit()
+            
+            if excess_ids:
+                ids_list = [row[0] for row in excess_ids]
+                # SQLite limits maximum number of variables in query (999), so batching or simple count delete
+                db.query(SentItem).filter(SentItem.id.in_(ids_list)).delete(synchronize_session=False)
+                db.commit()
+                logger.info("Purged %d excess total historical items.", len(ids_list))
+        except Exception as exc:
+            logger.error("Failed to global purge items: %s", exc)
 
     finally:
         db.close()
@@ -347,8 +369,9 @@ def _parse_published(entry) -> Optional[datetime]:
 def _build_message(entry, feed: Feed) -> str:
     """Build the Telegram Markdown message for a single RSS entry."""
     title = _clean_title(entry.get("title", "Sin título"), feed.title_regex_clean)
+    title = _transform_title(title, feed.title_transform_regex, feed.title_transform_replace)
     size = _extract_size(entry, feed.size_regex_extract)
-    link = _transform_link(entry.get("link", ""), feed.link_transform_regex, feed.link_transform_replace)
+    link = _get_final_link(entry, feed)
 
     display = f"{title} ({size})" if size else title
     return f"[{display}]({link})"
@@ -363,6 +386,17 @@ def _clean_title(title: str, pattern: Optional[str]) -> str:
     except re.error as exc:
         logger.warning("title_regex_clean compile error: %s", exc)
         return title.strip()
+
+
+def _transform_title(title: str, pattern: Optional[str], replacement: Optional[str]) -> str:
+    """Replace pattern with replacement in the title (e.g. swap characters)."""
+    if not pattern:
+        return title
+    try:
+        return re.sub(pattern, replacement or "", title).strip()
+    except re.error as exc:
+        logger.warning("title_transform_regex compile error: %s", exc)
+        return title
 
 
 def _extract_size(entry, pattern: Optional[str]) -> str:
@@ -390,6 +424,27 @@ def _extract_size(entry, pattern: Optional[str]) -> str:
     except re.error as exc:
         logger.warning("size_regex_extract compile error: %s", exc)
         return ""
+
+
+def _get_final_link(entry, feed: Feed) -> str:
+    """Determines final URL for the item factoring in custom prefix, GUID or standard link and transforms."""
+    base_link = ""
+    
+    if feed.link_use_guid:
+        # Use GUID / ID from RSS
+        val = entry.get("id") or entry.get("guid")
+        if val:
+            prefix = (feed.link_guid_prefix or "").strip()
+            base_link = prefix + str(val).strip()
+    
+    if not base_link:
+        base_link = entry.get("link") or ""
+        
+    if not base_link:
+        base_link = entry.get("title", "sin-enlace")
+        
+    # Apply final optional regex transform
+    return _transform_link(base_link, feed.link_transform_regex, feed.link_transform_replace)
 
 
 def _transform_link(link: str, pattern: Optional[str], replacement: Optional[str]) -> str:
@@ -505,7 +560,7 @@ def test_regex(pattern: str, replacement: Optional[str], text: str, mode: str) -
 
     try:
         if mode == "clean":
-            result = re.sub(compiled, "", text).strip()
+            result = re.sub(compiled, replacement or "", text).strip()
         elif mode == "extract":
             m = compiled.search(text)
             result = m.group(1).strip() if m and m.lastindex else (m.group(0) if m else "")

@@ -10,7 +10,11 @@
     <p class="small mb-0" style="color: #cbd5e1; font-weight: 400; opacity: 0.95;">
       Monitoreo de feeds RSS activos &nbsp;|&nbsp; 
       <i class="bi bi-clock-history me-1 text-accent"></i>Intervalo global: <strong>{{ global_cfg.check_interval or '60' }} min</strong> &nbsp;|&nbsp; 
-      <i class="bi bi-play-circle me-1 text-accent"></i>Próxima ejecución: <strong class="font-mono">{{ next_run }}</strong>
+      <i class="bi bi-play-circle me-1 text-accent"></i>Próxima ejecución: <strong class="font-mono">{{ next_run }}</strong> &nbsp;|&nbsp; 
+      <button id="btnRunAllGlobal" class="btn btn-sm btn-link text-accent-hover text-muted-on-hover border-0 p-0 ms-2 text-decoration-none d-inline-flex align-items-center gap-1" 
+              onclick="runAllFeeds()" style="font-size: 0.78rem; vertical-align: baseline; transition: color 0.2s;" title="Comprobar todas las fuentes inmediatamente">
+        <i id="iconRunAllGlobal" class="bi bi-play-circle-fill text-accent"></i> Ejecutar ahora
+      </button>
     </p>
   </div>
   <div class="d-flex align-items-center gap-3">
@@ -153,6 +157,68 @@
     </div>
   </div>
 </div>
+
+<!-- Recent Items Table (Full Width Row) -->
+<div class="row g-4 mt-2" id="items-list">
+  <div class="col-12">
+    <div class="glass-card overflow-hidden">
+      <div class="px-3 py-2 border-bottom border-glass d-flex justify-content-between align-items-center flex-wrap gap-2" style="background: rgba(255,255,255,0.01);">
+        <h6 class="mb-0 font-weight-bold d-flex align-items-center" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #e2e8f0;">
+          <i class="bi bi-journal-text text-accent me-2" style="font-size: 1.1rem;"></i> 
+          {% if q %}
+             Búsqueda: <span class="text-accent mx-1">"{{ q }}"</span> ({{ recent_items|length }})
+          {% else %}
+             Últimos {{ recent_items|length }} items registrados
+          {% endif %}
+        </h6>
+        <form method="GET" action="/#items-list" class="d-flex gap-0" style="width: auto; max-width: 320px;">
+          <div class="input-group input-group-sm">
+            <!-- Custom Border Style for uniform look: border-color is rgba(255,255,255,0.2) -->
+            <span class="input-group-text bg-black bg-opacity-25 text-muted rounded-0" 
+                  style="border: 1px solid rgba(255,255,255,0.2); border-right: none; border-radius: 0 !important;">
+              <i class="bi bi-search"></i>
+            </span>
+            <input type="text" class="form-control form-control-sm bg-black bg-opacity-25 text-white rounded-0 ps-3" 
+                   style="border: 1px solid rgba(255,255,255,0.2); border-left: none; border-right: none; border-radius: 0 !important; min-width: 150px;"
+                   name="q" value="{{ q }}" placeholder="Filtrar historial..." />
+            {% if q %}
+              <a href="/#items-list" class="btn btn-sm btn-outline-secondary text-white bg-black bg-opacity-10 rounded-0 d-flex align-items-center justify-content-center px-2" 
+                 style="border: 1px solid rgba(255,255,255,0.2); border-left: none; border-right: none; border-radius: 0 !important;" title="Borrar">
+                <i class="bi bi-x-lg" style="font-size: 0.75rem;"></i>
+              </a>
+            {% endif %}
+            <button class="btn btn-accent btn-sm px-3 rounded-0" type="submit" 
+                    style="border: 1px solid rgba(255,255,255,0.2); border-left: none; border-radius: 0 !important;">
+              Buscar
+            </button>
+          </div>
+        </form>
+      </div>
+      <div class="table-responsive" style="max-height: 850px; overflow-y: auto;">
+        <table class="table table-sm align-middle mb-0" style="font-size: 0.82rem; line-height: 1.1;">
+          <tbody>
+            {% if not recent_items %}
+            <tr>
+              <td class="text-center text-muted py-4">
+                <i class="bi bi-inbox-fill me-2 opacity-50"></i>No se han registrado envíos recientes.
+              </td>
+            </tr>
+            {% endif %}
+            {% for item, feed_name, acronym in recent_items %}
+            <tr class="feed-row" style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+              <td class="py-1 ps-3">
+                <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-accent fw-medium" title="{{ item.link }}" style="display: block; padding: 3px 0;">
+                  <span class="text-muted opacity-75">({{ acronym or feed_name }})</span> - {{ item.title or item.link }}
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
 {% endif %}
 
 <!-- Delete confirm modal -->
@@ -198,6 +264,15 @@
     color: #f1f5f9 !important;
     background: rgba(255,255,255,0.08) !important;
     border-color: #cbd5e1 !important;
+  }
+  .text-accent-hover:hover {
+    color: var(--accent) !important;
+  }
+  .text-muted-on-hover {
+    color: rgba(255,255,255,0.65) !important;
+  }
+  .text-muted-on-hover:hover {
+    color: #fff !important;
   }
 </style>
 <script>
@@ -257,6 +332,42 @@
       if (btnDelete) btnDelete.disabled = false;
       if (btnRun) btnRun.disabled = false;
       if (iconRun) iconRun.className = 'bi bi-play-fill icon-run';
+    }
+  }
+
+  async function runAllFeeds() {
+    const btn = document.getElementById('btnRunAllGlobal');
+    const icon = document.getElementById('iconRunAllGlobal');
+    
+    if (!btn) return;
+    
+    // Lock button to avoid double clicks
+    btn.disabled = true;
+    btn.style.pointerEvents = 'none';
+    btn.style.opacity = '0.7';
+    
+    const oldHTML = icon.className;
+    icon.className = 'bi bi-hourglass-split spinner-spin text-accent';
+    
+    try {
+      const resp = await fetch('/feeds/run-all', { method: 'POST' });
+      if (resp.ok) {
+        // Refresh on success
+        window.location.reload();
+      } else {
+        alert('Error al ejecutar la comprobación global.');
+        btn.disabled = false;
+        btn.style.pointerEvents = 'auto';
+        btn.style.opacity = '1';
+        icon.className = oldHTML;
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error de red al solicitar ejecución global.');
+      btn.disabled = false;
+      btn.style.pointerEvents = 'auto';
+      btn.style.opacity = '1';
+      icon.className = oldHTML;
     }
   }
 </script>

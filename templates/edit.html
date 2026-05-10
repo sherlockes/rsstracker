@@ -24,10 +24,17 @@
       <div class="glass-card p-4 mb-4">
         <h6 class="section-label mb-3"><i class="bi bi-info-circle me-2"></i>Información general</h6>
 
-        <div class="mb-3">
-          <label for="name" class="form-label">Nombre del tracker <span class="text-danger">*</span></label>
-          <input type="text" class="form-control" id="name" name="name"
-                 value="{{ feed.name if is_edit else '' }}" required placeholder="Mi Tracker Privado" />
+        <div class="row g-3 mb-3">
+          <div class="col-md-9">
+            <label for="name" class="form-label">Nombre del tracker <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="name" name="name"
+                   value="{{ feed.name if is_edit else '' }}" required placeholder="Mi Tracker Privado" />
+          </div>
+          <div class="col-md-3">
+            <label for="acronym" class="form-label">Siglas</label>
+            <input type="text" class="form-control" id="acronym" name="acronym"
+                   value="{{ feed.acronym if (is_edit and feed.acronym) else '' }}" placeholder="MTP" maxlength="20" />
+          </div>
         </div>
 
         <div class="mb-3">
@@ -78,6 +85,12 @@
                  value="https://tracker.com/download.php?id=12345&passkey=abc" oninput="updateWizAll()" />
         </div>
 
+        <div class="mb-3">
+          <label for="wizGuid" class="form-label small mb-1 fw-semibold text-accent">ID / GUID de Ejemplo (Opcional)</label>
+          <input type="text" class="form-control font-mono" id="wizGuid" 
+                 value="12345" oninput="updateWizAll()" placeholder="ej: 17481" />
+        </div>
+
         <hr class="border-secondary my-3" />
 
         <!-- 1. TITLE CLEAN STEP -->
@@ -108,6 +121,19 @@
               <input type="text" class="form-control form-control-sm font-mono py-0 px-2" id="txtWizWordVal" 
                      value="[PACK]" style="width: 120px; height: 24px;" oninput="updateWizAll()" />
             </div>
+            
+            <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="chkWizReplace" onchange="updateWizAll()" />
+                <label class="form-check-label small" for="chkWizReplace">Sustituir carácter o texto:</label>
+              </div>
+              <input type="text" class="form-control form-control-sm font-mono py-0 px-2" id="txtWizReplaceFind" 
+                     placeholder="." style="width: 50px; height: 24px;" oninput="updateWizAll()" />
+              <span class="small text-muted">por</span>
+              <input type="text" class="form-control form-control-sm font-mono py-0 px-2" id="txtWizReplaceWith" 
+                     placeholder="(vacio)" style="width: 60px; height: 24px;" oninput="updateWizAll()" />
+            </div>
+
             <div class="mt-3">
               <div class="small text-muted mb-1">Título resultante (Limpio):</div>
               <div class="p-2 rounded font-mono small text-success border border-success-subtle bg-success-subtle bg-opacity-10" id="wizCleanPreview">
@@ -150,6 +176,31 @@
           </div>
         </div>
 
+        <!-- 3. LINK CONFIGURATION STEP -->
+        <div class="mb-4">
+          <span class="badge-type badge-accent mb-2 d-inline-block" style="background: #6366f1; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;">3. CONFIGURACIÓN DE ENLACE</span>
+          <div class="p-3 rounded border border-secondary" style="background: rgba(0,0,0,0.15);">
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="link_use_guid" name="link_use_guid" 
+                     value="true" {% if feed.link_use_guid %}checked{% endif %} onchange="toggleGuidInput(); updateWizAll();" />
+              <label class="form-check-label small fw-semibold text-accent" for="link_use_guid">Construir enlace a la página del torrent a partir del ID (guid)</label>
+            </div>
+            <div class="form-text text-muted mb-3" style="font-size: 0.72rem; margin-left: 2.2rem;">Si está desactivado, se usará el enlace de descarga directa que incluye el RSS.</div>
+
+            <div id="guidPrefixGroup" class="mt-2 ps-4 pt-2 border-top border-secondary border-opacity-25" style="display:none;">
+              <label class="form-label small mb-1" style="font-size: 0.75rem;">Prefijo de la URL de destino (Dominio + Ruta):</label>
+              <div class="input-group input-group-sm" style="max-width: 500px;">
+                <input type="text" class="form-control font-mono" id="link_guid_prefix" name="link_guid_prefix"
+                       value="{{ feed.link_guid_prefix or '' }}" placeholder="https://www.ejemplo.org/torrents/" oninput="updateWizAll()" />
+                <button class="btn btn-secondary btn-sm px-2" type="button" onclick="autoDetectPrefix()" title="Auto-detectar">
+                  <i class="bi bi-magic"></i> Auto
+                </button>
+              </div>
+              <div class="form-text" style="font-size: 0.68rem; opacity: 0.8;">Se unirá al ID del torrent. Ejemplo: <code>https://web.com/torrents/</code> + <code>17481</code></div>
+            </div>
+          </div>
+        </div>
+
         <!-- MOCK TELEGRAM MESSAGE BUBBLE -->
         <div class="mb-0 mt-4 pt-3 border-top border-secondary">
           <span class="badge bg-info mb-2"><i class="bi bi-telegram me-1"></i>VISTA PREVIA DE NOTIFICACIÓN DE TELEGRAM</span>
@@ -170,9 +221,11 @@
 
       <!-- Hidden Regex fields for Form Submission -->
       <input type="hidden" id="title_regex_clean" name="title_regex_clean" value="{{ feed.title_regex_clean or '' }}" />
+      <input type="hidden" id="title_transform_regex" name="title_transform_regex" value="{{ feed.title_transform_regex or '' }}" />
+      <input type="hidden" id="title_transform_replace" name="title_transform_replace" value="{{ feed.title_transform_replace or '' }}" />
       <input type="hidden" id="size_regex_extract" name="size_regex_extract" value="{{ feed.size_regex_extract or '' }}" />
-      <input type="hidden" id="link_transform_regex" name="link_transform_regex" value="" />
-      <input type="hidden" id="link_transform_replace" name="link_transform_replace" value="" />
+      <input type="hidden" id="link_transform_regex" name="link_transform_regex" value="{{ feed.link_transform_regex or '' }}" />
+      <input type="hidden" id="link_transform_replace" name="link_transform_replace" value="{{ feed.link_transform_replace or '' }}" />
 
 
       <div class="d-flex gap-2">
@@ -245,9 +298,10 @@
     if (isNaN(index) || !realFeedItems[index]) return;
 
     const item = realFeedItems[index];
-    document.getElementById('wizTitle').value = item.title;
-    document.getElementById('wizContent').value = item.content;
-    document.getElementById('wizLink').value = item.link;
+    document.getElementById('wizTitle').value = item.title || '';
+    document.getElementById('wizContent').value = item.content || '';
+    document.getElementById('wizLink').value = item.link || '';
+    document.getElementById('wizGuid').value = item.guid || '';
 
     updateWizAll();
   }
@@ -292,8 +346,22 @@
     // Clean multiple spaces and trim
     title = title.replace(/\s+/g, ' ').trim();
 
+    // APLICAR SUSTITUCIÓN ESPECÍFICA SI EXISTE
+    const doReplace = document.getElementById('chkWizReplace').checked;
+    const replaceFind = document.getElementById('txtWizReplaceFind').value;
+    const replaceWith = document.getElementById('txtWizReplaceWith').value;
+    
+    if (doReplace && replaceFind) {
+      try {
+        const subRx = new RegExp(replaceFind, 'gi');
+        title = title.replace(subRx, replaceWith);
+      } catch(e) {}
+    }
+
     document.getElementById('wizCleanPreview').textContent = title || '(Vacío)';
     document.getElementById('title_regex_clean').value = patterns.join('|');
+    document.getElementById('title_transform_regex').value = doReplace ? replaceFind : '';
+    document.getElementById('title_transform_replace').value = doReplace ? replaceWith : '';
   }
 
   function updateWizSizeExtract() {
@@ -338,8 +406,18 @@
   function updateTelegramPreview() {
     const title = document.getElementById('wizCleanPreview').textContent;
     const size = document.getElementById('wizExtractPreview').textContent;
-    const link = document.getElementById('wizLink').value;
+    const sampleLink = document.getElementById('wizLink').value;
+    const sampleGuid = document.getElementById('wizGuid').value;
     const hasSize = document.getElementById('wizExtractPreviewBox').classList.contains('bg-success');
+
+    // Calculate Base Link
+    let finalLink = sampleLink;
+    const useGuid = document.getElementById('link_use_guid').checked;
+    if (useGuid && sampleGuid) {
+      const prefix = document.getElementById('link_guid_prefix').value;
+      finalLink = (prefix || '').trim() + sampleGuid.trim();
+    }
+    if (!finalLink) finalLink = sampleLink;
 
     const displayTitle = hasSize && size && size !== 'No encontrado' && size !== 'Palabra requerida'
       ? `${title} (${size})`
@@ -347,12 +425,50 @@
 
     const linkEl = document.getElementById('telegramLinkPreview');
     linkEl.textContent = displayTitle;
-    linkEl.href = link || '#';
+    linkEl.href = finalLink || '#';
+    // Set as informative title as well
+    linkEl.title = "Haz clic para probar enlace: " + finalLink;
+  }
+
+  function toggleGuidInput() {
+    const isChecked = document.getElementById('link_use_guid').checked;
+    const group = document.getElementById('guidPrefixGroup');
+    group.style.display = isChecked ? 'block' : 'none';
+  }
+
+  function autoDetectPrefix() {
+    const feedUrl = document.getElementById('url').value.trim();
+    if (!feedUrl) {
+       alert("Escribe primero la URL del feed arriba para poder analizarla.");
+       return;
+    }
+    try {
+       const urlObj = new URL(feedUrl);
+       const suggested = urlObj.origin + "/torrents/";
+       const prefixInput = document.getElementById('link_guid_prefix');
+       if (!prefixInput.value || confirm("¿Deseas autocompletar con el prefijo sugerido: " + suggested + "?")) {
+         prefixInput.value = suggested;
+         updateWizAll();
+       }
+    } catch (e) {
+       alert("La URL del feed no parece válida.");
+    }
   }
 
   function loadWizardFromRegex() {
     const cleanPat = document.getElementById('title_regex_clean').value;
+    const transformPat = document.getElementById('title_transform_regex').value;
+    const transformRepl = document.getElementById('title_transform_replace').value;
     const extractPat = document.getElementById('size_regex_extract').value;
+    
+    // Trigger UI show/hide based on current DB states
+    toggleGuidInput();
+    
+    if (transformPat) {
+      document.getElementById('chkWizReplace').checked = true;
+      document.getElementById('txtWizReplaceFind').value = transformPat;
+      document.getElementById('txtWizReplaceWith').value = transformRepl;
+    }
 
     if (cleanPat) {
       document.getElementById('chkWizBrackets').checked = cleanPat.includes('\\[.*?\\]');

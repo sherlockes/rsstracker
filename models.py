@@ -36,14 +36,19 @@ class Feed(Base):
 
     id: int = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name: str = Column(String(255), nullable=False)
+    acronym: str | None = Column(String(20), nullable=True)
     url: str = Column(Text, nullable=False)
     interval: int = Column(Integer, default=60, nullable=False)  # minutes
 
     # --- Regex fields --------------------------------------------------------
     title_regex_clean: str | None = Column(Text, nullable=True)
+    title_transform_regex: str | None = Column(Text, nullable=True)
+    title_transform_replace: str | None = Column(Text, nullable=True)
     size_regex_extract: str | None = Column(Text, nullable=True)
     link_transform_regex: str | None = Column(Text, nullable=True)
     link_transform_replace: str | None = Column(Text, nullable=True)
+    link_use_guid: bool = Column(Boolean, default=False, nullable=False)
+    link_guid_prefix: str | None = Column(Text, nullable=True)
 
 
     # --- Telegram credentials ------------------------------------------------
@@ -75,12 +80,40 @@ class SentItem(Base):
     id: int = Column(Integer, primary_key=True, index=True, autoincrement=True)
     feed_id: int = Column(Integer, index=True, nullable=False)
     link: str = Column(Text, index=True, nullable=False)
+    title: str | None = Column(Text, nullable=True)
     sent_at: datetime = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 def init_db() -> None:
     """Create all tables and seed default config if needed."""
     Base.metadata.create_all(bind=engine)
+    
+    # Automatic migration for 'title' column in 'sent_items'
+    import sqlite3
+    try:
+        conn = sqlite3.connect("./data/rsstracker.db")
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(sent_items)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "title" not in columns:
+            cursor.execute("ALTER TABLE sent_items ADD COLUMN title TEXT")
+            conn.commit()
+
+        # Automatic migration for title transform columns in 'feeds'
+        cursor.execute("PRAGMA table_info(feeds)")
+        feed_columns = [row[1] for row in cursor.fetchall()]
+        for col in ("title_transform_regex", "title_transform_replace", "acronym", "link_guid_prefix"):
+            if col not in feed_columns:
+                cursor.execute(f"ALTER TABLE feeds ADD COLUMN {col} TEXT")
+                conn.commit()
+        if "link_use_guid" not in feed_columns:
+            cursor.execute("ALTER TABLE feeds ADD COLUMN link_use_guid INTEGER DEFAULT 0")
+            conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
     db = SessionLocal()
     try:
         for key in ("telegram_token", "chat_id", "check_interval", "max_items_per_message", "silent_mode_start", "silent_mode_end", "run_on_startup"):

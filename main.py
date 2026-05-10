@@ -33,6 +33,7 @@ from models import Feed, GlobalConfig, SentItem, SessionLocal, init_db
 from scheduler import (
     reschedule_all_feeds,
     reschedule_feed,
+    run_all_feeds_job,
     run_feed_now,
     scheduler,
     start_scheduler,
@@ -44,10 +45,34 @@ from scheduler import (
 # Logging                                                                      #
 # --------------------------------------------------------------------------- #
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+# --------------------------------------------------------------------------- #
+# Logging                                                                      #
+# --------------------------------------------------------------------------- #
+
+import logging.handlers
+
+# Ensure data directory exists for logs
+os.makedirs("data", exist_ok=True)
+log_file = "data/app.log"
+
+log_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+file_handler = logging.handlers.RotatingFileHandler(
+    log_file, maxBytes=1024 * 1024 * 5, backupCount=3, encoding="utf-8"
 )
+file_handler.setFormatter(log_formatter)
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(log_formatter)
+
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+# Clear existing handlers to avoid duplicate logging
+if root_logger.handlers:
+    root_logger.handlers.clear()
+root_logger.addHandler(file_handler)
+root_logger.addHandler(console_handler)
+
 logger = logging.getLogger("rsstracker.main")
 
 # --------------------------------------------------------------------------- #
@@ -144,7 +169,7 @@ templates.env.filters["fmt_dt"] = _fmt_dt  # type: ignore[attr-defined]
 
 
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, db: DB):
+async def dashboard(request: Request, db: DB, q: Optional[str] = None):
     feeds = db.query(Feed).order_by(Feed.name).all()
     global_job = scheduler.get_job("poll_all_feeds")
     next_run = "—"
@@ -189,6 +214,14 @@ async def dashboard(request: Request, db: DB):
         "chart_data": chart_data,
     }
 
+    # Obtener los últimos 500 items enviados con el nombre de su feed, filtrando por búsqueda
+    query = db.query(SentItem, Feed.name, Feed.acronym).join(Feed, SentItem.feed_id == Feed.id)
+    
+    if q and q.strip():
+        query = query.filter(SentItem.title.ilike(f"%{q}%"))
+
+    recent_items = query.order_by(SentItem.sent_at.desc()).limit(500).all()
+
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -197,6 +230,8 @@ async def dashboard(request: Request, db: DB):
             "next_run": next_run,
             "global_cfg": _global_config(db),
             "stats": stats,
+            "recent_items": recent_items,
+            "q": q or "",
         },
     )
 
@@ -224,21 +259,31 @@ async def feed_new_form(request: Request, db: DB):
 async def feed_new(
     db: DB,
     name: str = Form(...),
+    acronym: str = Form(""),
     url: str = Form(...),
     title_regex_clean: str = Form(""),
+    title_transform_regex: str = Form(""),
+    title_transform_replace: str = Form(""),
     size_regex_extract: str = Form(""),
     link_transform_regex: str = Form(""),
     link_transform_replace: str = Form(""),
+    link_use_guid: bool = Form(False),
+    link_guid_prefix: str = Form(""),
     enabled: bool = Form(False),
 ):
     feed = Feed(
         name=name,
+        acronym=acronym or None,
         url=url,
         interval=60,  # default placeholder in DB, scheduler uses global check_interval
         title_regex_clean=title_regex_clean or None,
+        title_transform_regex=title_transform_regex or None,
+        title_transform_replace=title_transform_replace or None,
         size_regex_extract=size_regex_extract or None,
         link_transform_regex=link_transform_regex or None,
         link_transform_replace=link_transform_replace or None,
+        link_use_guid=link_use_guid,
+        link_guid_prefix=link_guid_prefix or None,
         telegram_token=None,
         chat_id=None,
         enabled=enabled,
@@ -276,11 +321,16 @@ async def feed_edit(
     feed_id: int,
     db: DB,
     name: str = Form(...),
+    acronym: str = Form(""),
     url: str = Form(...),
     title_regex_clean: str = Form(""),
+    title_transform_regex: str = Form(""),
+    title_transform_replace: str = Form(""),
     size_regex_extract: str = Form(""),
     link_transform_regex: str = Form(""),
     link_transform_replace: str = Form(""),
+    link_use_guid: bool = Form(False),
+    link_guid_prefix: str = Form(""),
     enabled: bool = Form(False),
 ):
     feed = db.get(Feed, feed_id)
@@ -288,11 +338,16 @@ async def feed_edit(
         raise HTTPException(status_code=404, detail="Feed not found")
 
     feed.name = name
+    feed.acronym = acronym or None
     feed.url = url
     feed.title_regex_clean = title_regex_clean or None
+    feed.title_transform_regex = title_transform_regex or None
+    feed.title_transform_replace = title_transform_replace or None
     feed.size_regex_extract = size_regex_extract or None
     feed.link_transform_regex = link_transform_regex or None
     feed.link_transform_replace = link_transform_replace or None
+    feed.link_use_guid = link_use_guid
+    feed.link_guid_prefix = link_guid_prefix or None
     feed.enabled = enabled
     db.commit()
     reschedule_feed(feed_id)
@@ -332,6 +387,13 @@ async def feed_run(feed_id: int, db: DB):
     return {"success": True}
 
 
+@app.post("/feeds/run-all")
+async def feed_run_all():
+    from fastapi.concurrency import run_in_threadpool
+    await run_in_threadpool(run_all_feeds_job)
+    return {"success": True}
+
+
 # --------------------------------------------------------------------------- #
 # Global config                                                                #
 # --------------------------------------------------------------------------- #
@@ -353,6 +415,7 @@ async def config_save(
     chat_id: str = Form(""),
     check_interval: str = Form("60"),
     max_items_per_message: str = Form("100"),
+    history_limit_total: str = Form("10000"),
     silent_mode_start: str = Form(""),
     silent_mode_end: str = Form(""),
     run_on_startup: bool = Form(False),
@@ -363,6 +426,7 @@ async def config_save(
         ("chat_id", chat_id),
         ("check_interval", check_interval),
         ("max_items_per_message", max_items_per_message),
+        ("history_limit_total", history_limit_total),
         ("silent_mode_start", silent_mode_start),
         ("silent_mode_end", silent_mode_end),
         ("run_on_startup", run_on_startup_val),
@@ -408,6 +472,46 @@ async def config_restore(db_file: UploadFile = File(...)):
         
     return RedirectResponse("/config", status_code=303)
 
+
+
+# --------------------------------------------------------------------------- #
+# Logs Viewer                                                                  #
+# --------------------------------------------------------------------------- #
+
+@app.get("/logs", response_class=HTMLResponse)
+async def logs_view(request: Request, db: DB, lines: int = 500):
+    log_path = "data/app.log"
+    log_content = ""
+    if os.path.exists(log_path):
+        try:
+            # Read the last N lines
+            from collections import deque
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                log_content = "".join(deque(f, lines))
+        except Exception as exc:
+            log_content = f"Error leyendo archivo de log: {exc}"
+    else:
+        log_content = "Archivo de registro no encontrado aún."
+        
+    return templates.TemplateResponse(
+        request=request,
+        name="logs.html",
+        context={
+            "global_cfg": _global_config(db),
+            "log_content": log_content,
+            "lines": lines,
+        },
+    )
+
+
+@app.post("/logs/clear")
+async def logs_clear():
+    log_path = "data/app.log"
+    try:
+        open(log_path, "w").close()
+    except Exception:
+        pass
+    return RedirectResponse("/logs", status_code=303)
 
 
 # --------------------------------------------------------------------------- #
@@ -462,7 +566,8 @@ async def api_fetch_feed_items(url: str):
             items.append({
                 "title": entry.get("title", "Sin título"),
                 "content": content or "Sin descripción",
-                "link": entry.get("link", "")
+                "link": entry.get("link", ""),
+                "guid": entry.get("id") or entry.get("guid", "")
             })
 
         return JSONResponse({"items": items, "error": None})

@@ -19,6 +19,8 @@ Incluye una interfaz web moderna con diseño **Premium Dark Glassmorphism** y es
 - 🌙 **Modo Silencioso Inteligente**: Rango horario nocturno personalizable en el que el bot silenciará el sonido y la vibración, soportando incluso tramos que cruzan la medianoche.
 - ⚡ **Actualización en Arranque**: Opción para forzar un escaneo masivo e inmediato de todos los trackers en el segundo exacto en el que se inicia el contenedor Docker.
 - 💾 **Copias de Seguridad**: Sistema de exportación e importación de la base de datos SQLite completo y seguro integrado en el panel de control.
+- 🔍 **Buscador Global**: Motor de búsqueda de historial integrado en el Dashboard con soporte para encontrar cualquier registro entre miles de entradas instantáneamente.
+- 📁 **Gestión de Historial configurable**: Límite global de conservación de registros configurable para mantener la base de datos ligera borrando excedentes antiguos automáticamente.
 - 🐋 **Despliegue en 10 Segundos**: Contenerizado nativo con Docker y Docker Compose.
 
 ---
@@ -65,7 +67,11 @@ Cada tracker individual que añadas al sistema te permite parametrizar su compor
 | **`Size Regex Extract`** | Grupo de captura (1) para capturar los GBs/MBs del HTML de la descripción. |
 | **`Transform Regex`** | Patrón para cazar el ID de descarga de la URL nativa del tracker. |
 | **`Transform Replace`** | Plantilla destino para reescribir la URL hacia la ficha descriptiva usando `$1`. |
+| **`Siglas`** | Código corto opcional (Ej: *HDZ*) para identificar de forma compacta el origen en la lista de items. |
 | **`Telegram Token`** | Permite sobreescribir las credenciales globales para este feed específico. |
+| **`Transformación de Títulos`** | Capa secundaria de limpieza que permite sustituciones específicas (ej: reemplazar puntos `\.` por espacios). |
+| **`Modo Enlace (GUID)`** | Alternativa para forzar que el enlace apunte a la ficha del torrent usando el ID (`guid`) en lugar del enlace directo. |
+| **`Prefijo URL`** | Dominio/Ruta base para combinar con el ID (autodetección mágica disponible en el asistente). |
 
 ### 🧪 Ejemplos Prácticos de Expresiones Regulares
 
@@ -103,6 +109,7 @@ El menú **Configuración** centraliza la gestión avanzada del motor:
 ├── templates/           # Plantillas HTML Jinja2 (Modularizadas y Responsive).
 ├── data/                # Volumen persistente (Almacena rsstracker.db).
 ├── Dockerfile           # Receta de empaquetado de la imagen Python.
+├── populate_titles.py   # Script de utilidad para reparar y regenerar títulos y enlaces históricos.
 └── docker-compose.yml   # Orquestador de servicios y volúmenes locales.
 ```
 

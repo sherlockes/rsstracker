@@ -85,6 +85,19 @@
         </div>
 
         <div class="mb-4">
+          <label for="history_limit_total" class="form-label">Capacidad máxima del historial total</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-database-fill"></i></span>
+            <input type="number" class="form-control" id="history_limit_total" name="history_limit_total"
+                   value="{{ global_cfg.history_limit_total or '10000' }}" min="100" max="100000" required />
+            <span class="input-group-text">items</span>
+          </div>
+          <div class="form-text">
+            Límite total de registros a conservar en la base de datos. Recomendado: 10.000 - 20.000. Borrará automáticamente los registros más antiguos del sistema para no saturar.
+          </div>
+        </div>
+
+        <div class="mb-4">
           <label class="form-label">Modo nocturno silencioso (Telegram)</label>
           <div class="row g-2">
             <div class="col-6">
