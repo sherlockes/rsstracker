@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% set is_edit = feed is not none %}
-{% block title %}{{ 'Editar' if is_edit else 'Añadir' }} Feed — RSS Tracker{% endblock %}
+{% block title %}{{ i18n.edit.title_edit if is_edit else i18n.edit.title_new }} — RSS Tracker{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center gap-3 mb-4">
@@ -10,7 +10,7 @@
   <div>
     <h1 class="page-title mb-0">
       <i class="bi bi-{{ 'pencil' if is_edit else 'plus-circle' }}-fill text-accent me-2"></i>
-      {{ 'Editar' if is_edit else 'Añadir' }} Feed
+      {{ i18n.edit.title_edit if is_edit else i18n.edit.title_new }}
     </h1>
     {% if is_edit %}<p class="text-muted small mb-0">{{ feed.name }}</p>{% endif %}
   </div>
@@ -22,23 +22,23 @@
     <!-- MAIN COLUMN: Settings & Wizard -->
     <div class="col-lg-12">
       <div class="glass-card p-4 mb-4">
-        <h6 class="section-label mb-3"><i class="bi bi-info-circle me-2"></i>Información general</h6>
+        <h6 class="section-label mb-3"><i class="bi bi-info-circle me-2"></i>{{ i18n.edit.basic_info }}</h6>
 
         <div class="row g-3 mb-3">
           <div class="col-md-9">
-            <label for="name" class="form-label">Nombre del tracker <span class="text-danger">*</span></label>
+            <label for="name" class="form-label">{{ i18n.edit.feed_name }} <span class="text-danger">*</span></label>
             <input type="text" class="form-control" id="name" name="name"
-                   value="{{ feed.name if is_edit else '' }}" required placeholder="Mi Tracker Privado" />
+                   value="{{ feed.name if is_edit else '' }}" required placeholder="{{ i18n.edit.feed_name_placeholder }}" />
           </div>
           <div class="col-md-3">
-            <label for="acronym" class="form-label">Siglas</label>
+            <label for="acronym" class="form-label">{{ i18n.edit.feed_acronym }}</label>
             <input type="text" class="form-control" id="acronym" name="acronym"
                    value="{{ feed.acronym if (is_edit and feed.acronym) else '' }}" placeholder="MTP" maxlength="20" />
           </div>
         </div>
 
         <div class="mb-3">
-          <label for="url" class="form-label">URL del feed RSS <span class="text-danger">*</span></label>
+          <label for="url" class="form-label">{{ i18n.edit.feed_url }} <span class="text-danger">*</span></label>
           <input type="url" class="form-control font-mono" id="url" name="url"
                  value="{{ feed.url if is_edit else '' }}" required
                  placeholder="https://tracker.example.com/rss?passkey=..." />
@@ -47,46 +47,46 @@
         <div class="form-check form-switch mb-0">
           <input class="form-check-input" type="checkbox" id="enabled" name="enabled"
                  value="true" {{ 'checked' if (not is_edit or feed.enabled) else '' }} />
-          <label class="form-check-label" for="enabled">Feed activo</label>
+          <label class="form-check-label" for="enabled">{{ i18n.edit.enabled }}</label>
         </div>
       </div>
 
       <!-- 🧙 ASISTENTE DE CONFIGURACIÓN INTERACTIVO -->
       <div class="glass-card p-4 mb-4" id="interactiveWizard">
-        <h6 class="section-label mb-2 text-accent"><i class="bi bi-magic me-2"></i>Asistente de Configuración Interactivo</h6>
+        <h6 class="section-label mb-2 text-accent"><i class="bi bi-magic me-2"></i>{{ i18n.edit.wiz_title }}</h6>
         <!-- Selector de elementos reales RSS -->
         <div class="mb-3 p-3 rounded border border-secondary" style="background: rgba(0,0,0,0.15);">
           <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
             <button type="button" class="btn btn-sm btn-accent btn-glow" id="btnFetchWizItems" onclick="fetchWizItems()">
-              <i class="bi bi-cloud-download me-1"></i>🔌 Obtener ítems reales del RSS
+              <i class="bi bi-cloud-download me-1"></i>{{ i18n.edit.wiz_btn_fetch }}
             </button>
             <span id="wizFetchSpinner" class="spinner-border spinner-border-sm text-accent d-none" role="status"></span>
             <span id="wizFetchError" class="text-danger small d-none"></span>
           </div>
           <div class="d-none" id="divWizSelector">
-            <label for="selWizRealItems" class="form-label small text-accent fw-semibold mb-1">Selecciona un elemento real de tu RSS:</label>
+            <label for="selWizRealItems" class="form-label small text-accent fw-semibold mb-1">{{ i18n.edit.wiz_sel_label }}</label>
             <select class="form-select form-select-sm" id="selWizRealItems" onchange="applyWizRealItem()"></select>
           </div>
         </div>
 
         <!-- Sandbox Inputs Stacked -->
         <div class="mb-3">
-          <label for="wizTitle" class="form-label small mb-1 fw-semibold text-accent">Título de Ejemplo</label>
+          <label for="wizTitle" class="form-label small mb-1 fw-semibold text-accent">{{ i18n.edit.wiz_example_title }}</label>
           <input type="text" class="form-control font-mono" id="wizTitle" 
                  value="[PACK] La Casa del Dragón - Temp.1 [Dual] [1080p] - TorrentDescarga" oninput="updateWizAll()" />
         </div>
         <div class="mb-3">
-          <label for="wizContent" class="form-label small mb-1 fw-semibold text-accent">HTML / Descripción de Ejemplo (con tamaño)</label>
+          <label for="wizContent" class="form-label small mb-1 fw-semibold text-accent">{{ i18n.edit.wiz_example_html }}</label>
           <textarea class="form-control font-mono" id="wizContent" rows="4" oninput="updateWizAll()"><strong>Size:</strong> 15.2 GB<br><strong>Seeders:</strong> 42<br><strong>Description:</strong> Lorem ipsum dolor sit amet, consectetur adipiscing elit.</textarea>
         </div>
         <div class="mb-3">
-          <label for="wizLink" class="form-label small mb-1 fw-semibold text-accent">Enlace / URL de Ejemplo</label>
+          <label for="wizLink" class="form-label small mb-1 fw-semibold text-accent">{{ i18n.edit.wiz_example_link }}</label>
           <input type="text" class="form-control font-mono" id="wizLink" 
                  value="https://tracker.com/download.php?id=12345&passkey=abc" oninput="updateWizAll()" />
         </div>
 
         <div class="mb-3">
-          <label for="wizGuid" class="form-label small mb-1 fw-semibold text-accent">ID / GUID de Ejemplo (Opcional)</label>
+          <label for="wizGuid" class="form-label small mb-1 fw-semibold text-accent">{{ i18n.edit.wiz_example_guid }}</label>
           <input type="text" class="form-control font-mono" id="wizGuid" 
                  value="12345" oninput="updateWizAll()" placeholder="ej: 17481" />
         </div>
@@ -95,20 +95,20 @@
 
         <!-- 1. TITLE CLEAN STEP -->
         <div class="mb-4">
-          <span class="badge-type badge-clean mb-2 d-inline-block">1. LIMPIEZA DE TÍTULO</span>
+          <span class="badge-type badge-clean mb-2 d-inline-block">{{ i18n.edit.wiz_step1_title }}</span>
           <div class="p-3 rounded border border-secondary" style="background: rgba(0,0,0,0.15);">
             <div class="form-check form-switch mb-2">
               <input class="form-check-input" type="checkbox" id="chkWizBrackets" checked onchange="updateWizAll()" />
-              <label class="form-check-label small" for="chkWizBrackets">Quitar corchetes y su contenido <code>[...]</code> (ej: [PACK], [1080p])</label>
+              <label class="form-check-label small" for="chkWizBrackets">{{ i18n.edit.wiz_chk_brackets | safe }}</label>
             </div>
             <div class="form-check form-switch mb-2">
               <input class="form-check-input" type="checkbox" id="chkWizParens" onchange="updateWizAll()" />
-              <label class="form-check-label small" for="chkWizParens">Quitar paréntesis y su contenido <code>(...)</code> (ej: (2024))</label>
+              <label class="form-check-label small" for="chkWizParens">{{ i18n.edit.wiz_chk_parens | safe }}</label>
             </div>
             <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
               <div class="form-check form-switch mb-0">
                 <input class="form-check-input" type="checkbox" id="chkWizSymbol" onchange="updateWizAll()" />
-                <label class="form-check-label small" for="chkWizSymbol">Cortar a partir de cierto símbolo o palabra:</label>
+                <label class="form-check-label small" for="chkWizSymbol">{{ i18n.edit.wiz_chk_symbol }}</label>
               </div>
               <input type="text" class="form-control form-control-sm font-mono py-0 px-2" id="txtWizSymbolVal" 
                      value=" - " style="width: 80px; height: 24px;" oninput="updateWizAll()" />
@@ -116,7 +116,7 @@
             <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
               <div class="form-check form-switch mb-0">
                 <input class="form-check-input" type="checkbox" id="chkWizWord" onchange="updateWizAll()" />
-                <label class="form-check-label small" for="chkWizWord">Eliminar palabra específica del título:</label>
+                <label class="form-check-label small" for="chkWizWord">{{ i18n.edit.wiz_chk_word }}</label>
               </div>
               <input type="text" class="form-control form-control-sm font-mono py-0 px-2" id="txtWizWordVal" 
                      value="[PACK]" style="width: 120px; height: 24px;" oninput="updateWizAll()" />
@@ -125,17 +125,17 @@
             <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
               <div class="form-check form-switch mb-0">
                 <input class="form-check-input" type="checkbox" id="chkWizReplace" onchange="updateWizAll()" />
-                <label class="form-check-label small" for="chkWizReplace">Sustituir carácter o texto:</label>
+                <label class="form-check-label small" for="chkWizReplace">{{ i18n.edit.wiz_chk_replace }}</label>
               </div>
               <input type="text" class="form-control form-control-sm font-mono py-0 px-2" id="txtWizReplaceFind" 
                      placeholder="." style="width: 50px; height: 24px;" oninput="updateWizAll()" />
-              <span class="small text-muted">por</span>
+              <span class="small text-muted">{{ i18n.edit.wiz_replace_to }}</span>
               <input type="text" class="form-control form-control-sm font-mono py-0 px-2" id="txtWizReplaceWith" 
                      placeholder="(vacio)" style="width: 60px; height: 24px;" oninput="updateWizAll()" />
             </div>
 
             <div class="mt-3">
-              <div class="small text-muted mb-1">Título resultante (Limpio):</div>
+              <div class="small text-muted mb-1">{{ i18n.edit.wiz_clean_preview }}</div>
               <div class="p-2 rounded font-mono small text-success border border-success-subtle bg-success-subtle bg-opacity-10" id="wizCleanPreview">
                 La Casa del Dragón - Temp.1
               </div>
@@ -145,11 +145,11 @@
 
         <!-- 2. SIZE EXTRACT STEP -->
         <div class="mb-4">
-          <span class="badge-type badge-extract mb-2 d-inline-block">2. EXTRACCIÓN DE TAMAÑO</span>
+          <span class="badge-type badge-extract mb-2 d-inline-block">{{ i18n.edit.wiz_step2_title }}</span>
           <div class="p-3 rounded border border-secondary" style="background: rgba(0,0,0,0.15);">
             <div class="row g-2 align-items-center mb-2">
               <div class="col-8 col-sm-9">
-                <label for="wizExtractLabel" class="form-label small mb-0">Palabra/Texto que va justo antes del tamaño (ej: <code>Size:</code> o <code>Tamaño:</code>):</label>
+                <label for="wizExtractLabel" class="form-label small mb-0">{{ i18n.edit.wiz_extract_label | safe }}</label>
               </div>
               <div class="col-4 col-sm-3">
                 <input type="text" class="form-control form-control-sm font-mono" id="wizExtractLabel" 
@@ -158,17 +158,17 @@
             </div>
             <div class="row g-2 align-items-center">
               <div class="col-8 col-sm-9">
-                <label for="selWizExtractFormat" class="form-label small mb-0">Unidades esperadas:</label>
+                <label for="selWizExtractFormat" class="form-label small mb-0">{{ i18n.edit.wiz_extract_units }}</label>
               </div>
               <div class="col-4 col-sm-3">
                 <select class="form-select form-select-sm" id="selWizExtractFormat" onchange="updateWizSizeExtract()">
-                  <option value="standard">Cualquiera (GB, MB, GiB, MiB)</option>
-                  <option value="strict">Solo binario (GiB, MiB)</option>
+                  <option value="standard">{{ i18n.edit.wiz_unit_any }}</option>
+                  <option value="strict">{{ i18n.edit.wiz_unit_bin }}</option>
                 </select>
               </div>
             </div>
             <div class="mt-3 d-flex align-items-center justify-content-between">
-              <span class="small text-muted">Tamaño extraído detectado:</span>
+              <span class="small text-muted">{{ i18n.edit.wiz_extract_detected }}</span>
               <span id="wizExtractPreviewBox" class="badge bg-success font-mono" style="font-size: 0.85rem; padding: 6px 12px;">
                 <i class="bi bi-check-circle me-1"></i><span id="wizExtractPreview">15.2 GB</span>
               </span>
@@ -178,17 +178,17 @@
 
         <!-- 3. LINK CONFIGURATION STEP -->
         <div class="mb-4">
-          <span class="badge-type badge-accent mb-2 d-inline-block" style="background: #6366f1; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;">3. CONFIGURACIÓN DE ENLACE</span>
+          <span class="badge-type badge-accent mb-2 d-inline-block" style="background: #6366f1; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;">{{ i18n.edit.wiz_step3_title }}</span>
           <div class="p-3 rounded border border-secondary" style="background: rgba(0,0,0,0.15);">
             <div class="form-check form-switch mb-2">
               <input class="form-check-input" type="checkbox" id="link_use_guid" name="link_use_guid" 
-                     value="true" {% if feed.link_use_guid %}checked{% endif %} onchange="toggleGuidInput(); updateWizAll();" />
-              <label class="form-check-label small fw-semibold text-accent" for="link_use_guid">Construir enlace a la página del torrent a partir del ID (guid)</label>
+                     value="true" {% if feed and feed.link_use_guid %}checked{% endif %} onchange="toggleGuidInput(); updateWizAll();" />
+              <label class="form-check-label small fw-semibold text-accent" for="link_use_guid">{{ i18n.edit.wiz_chk_guid }}</label>
             </div>
-            <div class="form-text text-muted mb-3" style="font-size: 0.72rem; margin-left: 2.2rem;">Si está desactivado, se usará el enlace de descarga directa que incluye el RSS.</div>
+            <div class="form-text text-muted mb-3" style="font-size: 0.72rem; margin-left: 2.2rem;">{{ i18n.edit.wiz_guid_help }}</div>
 
             <div id="guidPrefixGroup" class="mt-2 ps-4 pt-2 border-top border-secondary border-opacity-25" style="display:none;">
-              <label class="form-label small mb-1" style="font-size: 0.75rem;">Prefijo de la URL de destino (Dominio + Ruta):</label>
+              <label class="form-label small mb-1" style="font-size: 0.75rem;">{{ i18n.edit.wiz_prefix_label }}</label>
               <div class="input-group input-group-sm" style="max-width: 500px;">
                 <input type="text" class="form-control font-mono" id="link_guid_prefix" name="link_guid_prefix"
                        value="{{ feed.link_guid_prefix or '' }}" placeholder="https://www.ejemplo.org/torrents/" oninput="updateWizAll()" />
@@ -196,14 +196,14 @@
                   <i class="bi bi-magic"></i> Auto
                 </button>
               </div>
-              <div class="form-text" style="font-size: 0.68rem; opacity: 0.8;">Se unirá al ID del torrent. Ejemplo: <code>https://web.com/torrents/</code> + <code>17481</code></div>
+              <div class="form-text" style="font-size: 0.68rem; opacity: 0.8;">{{ i18n.edit.wiz_prefix_help }} <code>https://web.com/torrents/</code> + <code>17481</code></div>
             </div>
           </div>
         </div>
 
         <!-- MOCK TELEGRAM MESSAGE BUBBLE -->
         <div class="mb-0 mt-4 pt-3 border-top border-secondary">
-          <span class="badge bg-info mb-2"><i class="bi bi-telegram me-1"></i>VISTA PREVIA DE NOTIFICACIÓN DE TELEGRAM</span>
+          <span class="badge bg-info mb-2"><i class="bi bi-telegram me-1"></i>{{ i18n.edit.wiz_preview_title }}</span>
           <div class="p-3 rounded border border-info-subtle bg-info-subtle bg-opacity-10" style="background: rgba(36, 129, 204, 0.08);">
             <div class="telegram-preview-bubble">
               <span class="telegram-sender" style="color: #4da3ff; font-weight: bold; font-size: 0.9rem;">RSS Tracker Bot</span>
@@ -212,7 +212,7 @@
               </div>
             </div>
             <div class="form-text mt-2 small text-muted">
-              Así es exactamente como se enviará el mensaje del ítem a Telegram.
+              {{ i18n.edit.wiz_preview_desc }}
             </div>
           </div>
         </div>
@@ -230,9 +230,9 @@
 
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-accent btn-glow flex-grow-1">
-          <i class="bi bi-floppy me-2"></i>Guardar feed
+          <i class="bi bi-floppy me-2"></i>{{ i18n.edit.btn_save }}
         </button>
-        <a href="/" class="btn btn-outline-secondary px-4">Cancelar</a>
+        <a href="/" class="btn btn-outline-secondary px-4">{{ i18n.edit.btn_cancel }}</a>
       </div>
     </div><!-- /left col -->
 
@@ -257,7 +257,7 @@
     selectorDiv.classList.add('d-none');
 
     if (!url) {
-      errSpan.textContent = '⚠️ Primero escribe la URL del feed RSS arriba.';
+      errSpan.textContent = '{{ i18n.edit.wiz_fetch_url_warning }}';
       errSpan.classList.remove('d-none');
       spinner.classList.add('d-none');
       return;
@@ -267,10 +267,10 @@
       const res = await fetch('/api/fetch-feed-items?url=' + encodeURIComponent(url));
       const data = await res.json();
       if (data.error) {
-        errSpan.textContent = '❌ ' + data.error;
+        errSpan.textContent = '{{ i18n.edit.js_rss_err }} ' + data.error;
         errSpan.classList.remove('d-none');
       } else if (!data.items || data.items.length === 0) {
-        errSpan.textContent = '⚠️ No se encontraron elementos en este RSS.';
+        errSpan.textContent = '{{ i18n.edit.js_no_items }}';
         errSpan.classList.remove('d-none');
       } else {
         realFeedItems = data.items;
@@ -285,7 +285,7 @@
         applyWizRealItem();
       }
     } catch (err) {
-      errSpan.textContent = '❌ Error de red: ' + err.message;
+      errSpan.textContent = '{{ i18n.edit.js_net_err }} ' + err.message;
       errSpan.classList.remove('d-none');
     } finally {
       spinner.classList.add('d-none');
@@ -358,7 +358,7 @@
       } catch(e) {}
     }
 
-    document.getElementById('wizCleanPreview').textContent = title || '(Vacío)';
+    document.getElementById('wizCleanPreview').textContent = title || '{{ i18n.edit.js_empty }}';
     document.getElementById('title_regex_clean').value = patterns.join('|');
     document.getElementById('title_transform_regex').value = doReplace ? replaceFind : '';
     document.getElementById('title_transform_replace').value = doReplace ? replaceWith : '';
@@ -370,7 +370,7 @@
     const format = document.getElementById('selWizExtractFormat').value;
 
     if (!label) {
-      document.getElementById('wizExtractPreview').textContent = 'Palabra requerida';
+      document.getElementById('wizExtractPreview').textContent = '{{ i18n.edit.js_word_required }}';
       document.getElementById('wizExtractPreviewBox').className = 'badge bg-danger';
       document.getElementById('size_regex_extract').value = '';
       return;
@@ -394,11 +394,11 @@
         document.getElementById('wizExtractPreview').textContent = match[1].trim();
         document.getElementById('wizExtractPreviewBox').className = 'badge bg-success';
       } else {
-        document.getElementById('wizExtractPreview').textContent = 'No encontrado';
+        document.getElementById('wizExtractPreview').textContent = '{{ i18n.edit.js_not_found }}';
         document.getElementById('wizExtractPreviewBox').className = 'badge bg-danger';
       }
     } catch (err) {
-      document.getElementById('wizExtractPreview').textContent = 'Error de patrón';
+      document.getElementById('wizExtractPreview').textContent = '{{ i18n.edit.js_pattern_error }}';
       document.getElementById('wizExtractPreviewBox').className = 'badge bg-danger';
     }
   }
@@ -419,7 +419,7 @@
     }
     if (!finalLink) finalLink = sampleLink;
 
-    const displayTitle = hasSize && size && size !== 'No encontrado' && size !== 'Palabra requerida'
+    const displayTitle = hasSize && size && size !== '{{ i18n.edit.js_not_found }}' && size !== '{{ i18n.edit.js_word_required }}'
       ? `${title} (${size})`
       : title;
 
@@ -439,19 +439,19 @@
   function autoDetectPrefix() {
     const feedUrl = document.getElementById('url').value.trim();
     if (!feedUrl) {
-       alert("Escribe primero la URL del feed arriba para poder analizarla.");
+       alert("{{ i18n.edit.wiz_fetch_url_warning | replace('⚠️ ','') }}");
        return;
     }
     try {
        const urlObj = new URL(feedUrl);
        const suggested = urlObj.origin + "/torrents/";
        const prefixInput = document.getElementById('link_guid_prefix');
-       if (!prefixInput.value || confirm("¿Deseas autocompletar con el prefijo sugerido: " + suggested + "?")) {
+       if (!prefixInput.value || confirm("{{ i18n.edit.js_auto_prefix_ask }}" + suggested + "?")) {
          prefixInput.value = suggested;
          updateWizAll();
        }
     } catch (e) {
-       alert("La URL del feed no parece válida.");
+       alert("{{ i18n.edit.js_url_invalid }}");
     }
   }
 

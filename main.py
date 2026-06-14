@@ -40,6 +40,7 @@ from scheduler import (
     stop_scheduler,
     test_regex,
 )
+from translations import get_lang
 
 # --------------------------------------------------------------------------- #
 # Logging                                                                      #
@@ -149,6 +150,12 @@ def _global_config(db: Session) -> dict[str, str]:
     return {row.key: (row.value or "") for row in rows}
 
 
+def _get_active_lang_dict(db: Session):
+    lang_row = db.get(GlobalConfig, "language")
+    lang_code = lang_row.value if lang_row and lang_row.value else "en"
+    return get_lang(lang_code)
+
+
 def _fmt_dt(dt: Optional[datetime]) -> str:
     try:
         if dt is None:
@@ -175,7 +182,7 @@ async def dashboard(request: Request, db: DB, q: Optional[str] = None):
     next_run = "—"
     if global_job and global_job.next_run_time:
         try:
-            next_run = global_job.next_run_time.astimezone().strftime("%H:%M:%S")
+            next_run = global_job.next_run_time.astimezone().strftime("%H:%M")
         except Exception as exc:
             logger.error("Error formatting next run time: %s", exc)
             next_run = str(global_job.next_run_time)
@@ -190,17 +197,26 @@ async def dashboard(request: Request, db: DB, q: Optional[str] = None):
     sent_day = db.query(SentItem).filter(SentItem.sent_at >= last_day).count()
     sent_week = db.query(SentItem).filter(SentItem.sent_at >= last_week).count()
     sent_month = db.query(SentItem).filter(SentItem.sent_at >= last_month).count()
+    total_items = db.query(SentItem).count()
 
     # Mini weekly chart stats
     chart_data = []
-    weekdays_es = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
+    
+    lang_row = db.get(GlobalConfig, "language")
+    active_code = lang_row.value if lang_row and lang_row.value else "en"
+    
+    if active_code == "es":
+        weekdays = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
+    else:
+        weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
     for i in range(6, -1, -1):
         day_date = (dt.now() - timedelta(days=i)).date()
         day_start = dt.combine(day_date, dt.min.time())
         day_end = dt.combine(day_date, dt.max.time())
         count = db.query(SentItem).filter(SentItem.sent_at >= day_start, SentItem.sent_at <= day_end).count()
         weekday_idx = int(day_date.strftime("%w"))
-        day_name = weekdays_es[weekday_idx]
+        day_name = weekdays[weekday_idx]
         chart_data.append({"day": day_name, "count": count})
 
     stats = {
@@ -208,6 +224,7 @@ async def dashboard(request: Request, db: DB, q: Optional[str] = None):
         "active": sum(1 for f in feeds if f.enabled),
         "inactive": sum(1 for f in feeds if not f.enabled),
         "error": sum(1 for f in feeds if (f.consecutive_errors or 0) > 0),
+        "total_items": total_items,
         "sent_day": sent_day,
         "sent_week": sent_week,
         "sent_month": sent_month,
@@ -231,7 +248,9 @@ async def dashboard(request: Request, db: DB, q: Optional[str] = None):
             "global_cfg": _global_config(db),
             "stats": stats,
             "recent_items": recent_items,
+            "last_day": last_day,
             "q": q or "",
+            "i18n": _get_active_lang_dict(db),
         },
     )
 
@@ -251,6 +270,7 @@ async def feed_new_form(request: Request, db: DB):
             "feed": None,
             "action": "/feeds/new",
             "global_cfg": _global_config(db),
+            "i18n": _get_active_lang_dict(db),
         },
     )
 
@@ -312,6 +332,7 @@ async def feed_edit_form(feed_id: int, request: Request, db: DB):
             "feed": feed,
             "action": f"/feeds/{feed_id}/edit",
             "global_cfg": _global_config(db),
+            "i18n": _get_active_lang_dict(db),
         },
     )
 
@@ -404,7 +425,10 @@ async def config_form(request: Request, db: DB):
     return templates.TemplateResponse(
         request=request,
         name="config.html",
-        context={"global_cfg": _global_config(db)},
+        context={
+            "global_cfg": _global_config(db),
+            "i18n": _get_active_lang_dict(db),
+        },
     )
 
 
@@ -419,6 +443,7 @@ async def config_save(
     silent_mode_start: str = Form(""),
     silent_mode_end: str = Form(""),
     run_on_startup: bool = Form(False),
+    language: str = Form("en"),
 ):
     run_on_startup_val = "true" if run_on_startup else "false"
     for key, value in [
@@ -430,6 +455,7 @@ async def config_save(
         ("silent_mode_start", silent_mode_start),
         ("silent_mode_end", silent_mode_end),
         ("run_on_startup", run_on_startup_val),
+        ("language", language),
     ]:
         row = db.get(GlobalConfig, key)
         if row:
@@ -500,6 +526,7 @@ async def logs_view(request: Request, db: DB, lines: int = 500):
             "global_cfg": _global_config(db),
             "log_content": log_content,
             "lines": lines,
+            "i18n": _get_active_lang_dict(db),
         },
     )
 

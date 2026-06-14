@@ -116,7 +116,7 @@ def init_db() -> None:
 
     db = SessionLocal()
     try:
-        for key in ("telegram_token", "chat_id", "check_interval", "max_items_per_message", "silent_mode_start", "silent_mode_end", "run_on_startup"):
+        for key in ("telegram_token", "chat_id", "check_interval", "max_items_per_message", "silent_mode_start", "silent_mode_end", "run_on_startup", "language"):
             if not db.get(GlobalConfig, key):
                 if key == "check_interval":
                     default_val = "60"
@@ -124,6 +124,8 @@ def init_db() -> None:
                     default_val = "100"
                 elif key == "run_on_startup":
                     default_val = "false"
+                elif key == "language":
+                    default_val = "en"
                 else:
                     default_val = ""
                 db.add(GlobalConfig(key=key, value=default_val))

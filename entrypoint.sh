@@ -6,5 +6,8 @@ set -e
 mkdir -p /app/data
 chown -R appuser:appuser /app/data
 
+# Borra el log previo al arrancar para empezar limpio
+rm -f /app/data/app.log
+
 # Cambia a appuser y arranca uvicorn
 exec su-exec appuser uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1

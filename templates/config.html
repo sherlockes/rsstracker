@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Configuración Global — RSS Tracker{% endblock %}
+{% block title %}{{ i18n.config.title }} — RSS Tracker{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center gap-3 mb-4">
@@ -8,27 +8,87 @@
   </a>
   <div>
     <h1 class="page-title mb-0">
-      <i class="bi bi-gear-fill text-accent me-2"></i>Configuración Global
+      <i class="bi bi-gear-fill text-accent me-2"></i>{{ i18n.config.title }}
     </h1>
-    <p class="text-muted small mb-0">Credenciales de Telegram por defecto</p>
   </div>
 </div>
 
-<div class="row g-4">
-  <!-- COLUMN 1: CONFIGURATION FORM -->
-  <div class="col-lg-6">
-    <div class="glass-card p-4">
-      <div class="mb-3 d-flex align-items-center gap-2">
-        <i class="bi bi-telegram fs-3 text-accent"></i>
-        <div>
-          <h6 class="mb-0 fw-semibold">Bot de Telegram y Opciones</h6>
-          <small class="text-muted">Configuración global del bot y del intervalo de sincronización</small>
+<!-- MAIN CONFIGURATION FORM -->
+<form action="/config" method="post" id="configForm">
+  <div class="row g-4 mb-4">
+    <!-- GROUP 1: GENERAL -->
+    <div class="col-lg-6">
+      <div class="glass-card p-4 h-100">
+        <div class="mb-3 d-flex align-items-center gap-2">
+          <i class="bi bi-sliders fs-4 text-accent"></i>
+          <h6 class="mb-0 fw-semibold">{{ i18n.config.group_general }}</h6>
+        </div>
+        <hr class="border-secondary mb-4" />
+
+        <!-- Language selector -->
+        <div class="mb-4">
+          <label for="language" class="form-label">{{ i18n.config.language }}</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-translate"></i></span>
+            <select class="form-select" id="language" name="language">
+              <option value="en" {{ 'selected' if global_cfg.language == 'en' else '' }}>🇺🇸 {{ i18n.config.lang_en }}</option>
+              <option value="es" {{ 'selected' if global_cfg.language == 'es' else '' }}>🇪🇸 {{ i18n.config.lang_es }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Check interval -->
+        <div class="mb-4">
+          <label for="check_interval" class="form-label">{{ i18n.config.check_interval }}</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-clock-history"></i></span>
+            <input type="number" class="form-control" id="check_interval" name="check_interval"
+                   value="{{ global_cfg.check_interval or '60' }}" min="1" max="10080" required />
+          </div>
+          <div class="form-text">
+            {{ i18n.config.interval_help }}
+          </div>
+        </div>
+
+        <!-- History limit -->
+        <div class="mb-4">
+          <label for="history_limit_total" class="form-label">{{ i18n.config.history_limit }}</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-database-fill"></i></span>
+            <input type="number" class="form-control" id="history_limit_total" name="history_limit_total"
+                   value="{{ global_cfg.history_limit_total or '10000' }}" min="100" max="100000" required />
+          </div>
+          <div class="form-text">
+            {{ i18n.config.history_help }}
+          </div>
+        </div>
+
+        <!-- Run on startup -->
+        <div class="mb-2">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="run_on_startup" name="run_on_startup"
+                   value="true" {{ 'checked' if global_cfg.run_on_startup == 'true' else '' }} />
+            <label class="form-check-label fw-semibold" for="run_on_startup">{{ i18n.config.run_on_startup }}</label>
+          </div>
+          <div class="form-text">
+            {{ i18n.config.run_on_startup_help }}
+          </div>
         </div>
       </div>
-      <hr class="border-secondary" />
-      <form action="/config" method="post">
+    </div>
+
+    <!-- GROUP 2: TELEGRAM -->
+    <div class="col-lg-6">
+      <div class="glass-card p-4 h-100">
+        <div class="mb-3 d-flex align-items-center gap-2">
+          <i class="bi bi-telegram fs-4 text-accent"></i>
+          <h6 class="mb-0 fw-semibold">{{ i18n.config.group_telegram }}</h6>
+        </div>
+        <hr class="border-secondary mb-4" />
+
+        <!-- Bot Token -->
         <div class="mb-4">
-          <label for="telegram_token" class="form-label">Bot Token</label>
+          <label for="telegram_token" class="form-label">{{ i18n.config.bot_token }}</label>
           <div class="input-group">
             <span class="input-group-text"><i class="bi bi-key-fill"></i></span>
             <input type="password" class="form-control font-mono" id="telegram_token" name="telegram_token"
@@ -40,12 +100,13 @@
             </button>
           </div>
           <div class="form-text">
-            Obtén tu token con <a href="https://t.me/BotFather" target="_blank">@BotFather</a>.
+            {{ i18n.config.token_help | safe }}
           </div>
         </div>
 
+        <!-- Chat ID -->
         <div class="mb-4">
-          <label for="chat_id" class="form-label">Chat ID</label>
+          <label for="chat_id" class="form-label">{{ i18n.config.chat_id }}</label>
           <div class="input-group">
             <span class="input-group-text"><i class="bi bi-hash"></i></span>
             <input type="text" class="form-control font-mono" id="chat_id" name="chat_id"
@@ -53,142 +114,118 @@
                    placeholder="-1001234567890" />
           </div>
           <div class="form-text">
-            Para grupos usa el ID negativo (ej: <code>-100…</code>).
-            Puedes obtenerlo con <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a>.
+            {{ i18n.config.chat_id_help | safe }}
           </div>
         </div>
 
+        <!-- Max Items per message -->
         <div class="mb-4">
-          <label for="check_interval" class="form-label">Intervalo de chequeo global (minutos)</label>
-          <div class="input-group">
-            <span class="input-group-text"><i class="bi bi-clock-history"></i></span>
-            <input type="number" class="form-control" id="check_interval" name="check_interval"
-                   value="{{ global_cfg.check_interval or '60' }}" min="1" max="10080" required />
-            <span class="input-group-text">minutos</span>
-          </div>
-          <div class="form-text">
-            Tiempo entre chequeos para todos los feeds. Mínimo 1 min. Recomendado: 30–120 min.
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <label for="max_items_per_message" class="form-label">Elementos máximos por mensaje de Telegram</label>
+          <label for="max_items_per_message" class="form-label">{{ i18n.config.max_items }}</label>
           <div class="input-group">
             <span class="input-group-text"><i class="bi bi-list-ol"></i></span>
             <input type="number" class="form-control" id="max_items_per_message" name="max_items_per_message"
                    value="{{ global_cfg.max_items_per_message or '100' }}" min="1" max="500" required />
-            <span class="input-group-text">elementos</span>
           </div>
           <div class="form-text">
-            Límite de elementos combinados por mensaje enviado a Telegram para evitar saturación de la API.
+            {{ i18n.config.max_items_help }}
           </div>
         </div>
 
+        <!-- Silent Night mode -->
         <div class="mb-4">
-          <label for="history_limit_total" class="form-label">Capacidad máxima del historial total</label>
-          <div class="input-group">
-            <span class="input-group-text"><i class="bi bi-database-fill"></i></span>
-            <input type="number" class="form-control" id="history_limit_total" name="history_limit_total"
-                   value="{{ global_cfg.history_limit_total or '10000' }}" min="100" max="100000" required />
-            <span class="input-group-text">items</span>
-          </div>
-          <div class="form-text">
-            Límite total de registros a conservar en la base de datos. Recomendado: 10.000 - 20.000. Borrará automáticamente los registros más antiguos del sistema para no saturar.
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <label class="form-label">Modo nocturno silencioso (Telegram)</label>
+          <label class="form-label">{{ i18n.config.silent_mode }}</label>
           <div class="row g-2">
             <div class="col-6">
               <div class="input-group">
-                <span class="input-group-text small">Inicio</span>
+                <span class="input-group-text small">{{ i18n.config.start }}</span>
                 <input type="time" class="form-control" id="silent_mode_start" name="silent_mode_start"
                        value="{{ global_cfg.silent_mode_start or '' }}" />
               </div>
             </div>
             <div class="col-6">
               <div class="input-group">
-                <span class="input-group-text small">Fin</span>
+                <span class="input-group-text small">{{ i18n.config.end }}</span>
                 <input type="time" class="form-control" id="silent_mode_end" name="silent_mode_end"
                        value="{{ global_cfg.silent_mode_end or '' }}" />
               </div>
             </div>
           </div>
           <div class="form-text">
-            Durante este rango de horas, los mensajes combinados se enviarán de forma silenciosa (sin sonido ni vibración). Déjalo vacío para desactivar.
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="run_on_startup" name="run_on_startup"
-                   value="true" {{ 'checked' if global_cfg.run_on_startup == 'true' else '' }} />
-            <label class="form-check-label fw-semibold" for="run_on_startup">Actualizar feeds al arrancar la aplicación</label>
-          </div>
-          <div class="form-text">
-            Si está activado, la aplicación forzará un chequeo completo de todos los feeds RSS inmediatamente al iniciarse el contenedor.
+            {{ i18n.config.silent_help }}
           </div>
         </div>
 
         <!-- Quick Telegram test -->
-        <div class="mb-4">
-          <button type="button" class="btn btn-outline-accent w-100" id="btnTestTelegram">
-            <i class="bi bi-send me-2"></i>Enviar mensaje de prueba
+        <div class="mb-2">
+          <button type="button" class="btn btn-outline-accent btn-sm w-100" id="btnTestTelegram">
+            <i class="bi bi-send me-2"></i>{{ i18n.config.test_msg_btn }}
           </button>
-          <div id="testResult" class="mt-2 small d-none"></div>
+          <div id="testResult" class="mt-2 small d-none text-center"></div>
         </div>
-
-        <div class="d-grid">
-          <button type="submit" class="btn btn-accent btn-glow">
-            <i class="bi bi-floppy me-2"></i>Guardar configuración
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   </div>
+</form>
 
-  <!-- COLUMN 2: BACKUPS -->
-  <div class="col-lg-6">
+<!-- GROUP 3: DATABASE -->
+<div class="row g-4 mb-5">
+  <div class="col-12">
     <div class="glass-card p-4">
-      <div class="mb-2 d-flex align-items-center gap-2">
+      <div class="mb-3 d-flex align-items-center gap-2">
         <i class="bi bi-database-fill-gear fs-4 text-accent"></i>
-        <div>
-          <h6 class="mb-0 fw-semibold">Copias de seguridad</h6>
-          <small class="text-light opacity-75">Respaldo y restauración de la base de datos</small>
-        </div>
+        <h6 class="mb-0 fw-semibold">{{ i18n.config.group_database }}</h6>
       </div>
-      <hr class="border-secondary my-2" />
-
-      <!-- Export database -->
-      <div class="mb-3">
-        <label class="form-label fw-semibold mb-1">Exportar base de datos</label>
-        <p class="text-light small mb-2 opacity-90">
-          Descarga un respaldo completo (<code>rsstracker.db</code>) con todos tus feeds, configuraciones e historial de envíos.
-        </p>
-        <a href="/config/backup" class="btn btn-outline-accent btn-sm w-100">
-          <i class="bi bi-download me-2"></i>Descargar copia de seguridad
-        </a>
-      </div>
-
-      <!-- Import database -->
-      <div class="mb-0">
-        <label class="form-label fw-semibold mb-1">Restaurar copia de seguridad</label>
-        <p class="text-light small mb-2 opacity-90">
-          Sube un archivo SQLite (<code>.db</code>) para reemplazar y restaurar los datos actuales.
-        </p>
-        <form action="/config/restore" method="post" enctype="multipart/form-data" onsubmit="return confirm('¿Estás seguro de que deseas sobrescribir la base de datos? Se perderán todos los datos actuales.');">
-          <div class="mb-2">
-            <input class="form-control form-control-sm" type="file" id="db_file" name="db_file" accept=".db" required />
+      <hr class="border-secondary mb-4" />
+      
+      <div class="row g-4">
+        <!-- Export -->
+        <div class="col-md-6">
+          <div class="p-3 rounded bg-white bg-opacity-10 h-100">
+            <label class="form-label fw-semibold mb-1">
+              <i class="bi bi-download me-2"></i>{{ i18n.config.export_label }}
+            </label>
+            <p class="text-light small mb-3 opacity-75">
+              {{ i18n.config.export_desc | safe }}
+            </p>
+            <a href="/config/backup" class="btn btn-outline-accent btn-sm w-100">
+              {{ i18n.config.export_btn }}
+            </a>
           </div>
-          <button type="submit" class="btn btn-outline-danger btn-sm w-100">
-            <i class="bi bi-upload me-2"></i>Restaurar base de datos
-          </button>
-        </form>
+        </div>
+
+        <!-- Restore -->
+        <div class="col-md-6">
+          <div class="p-3 rounded bg-white bg-opacity-10 h-100">
+            <label class="form-label fw-semibold mb-1">
+              <i class="bi bi-upload me-2"></i>{{ i18n.config.import_label }}
+            </label>
+            <p class="text-light small mb-3 opacity-75">
+              {{ i18n.config.import_desc | safe }}
+            </p>
+            <form action="/config/restore" method="post" enctype="multipart/form-data" onsubmit="return confirm('{{ i18n.config.js_confirm_restore }}');">
+              <div class="d-flex gap-2">
+                <input class="form-control form-control-sm" type="file" id="db_file" name="db_file" accept=".db" required />
+                <button type="submit" class="btn btn-outline-danger btn-sm px-3">
+                  {{ i18n.config.import_btn }}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </div>
+
+<!-- FINAL SAVE BUTTON (LINKED TO configForm) -->
+<div class="row mb-5">
+  <div class="col-12 text-center">
+    <button type="submit" form="configForm" class="btn btn-accent btn-glow px-5 py-3 fw-bold shadow">
+      <i class="bi bi-floppy-fill me-2 fs-5"></i>{{ i18n.config.save_btn }}
+    </button>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -207,13 +244,13 @@
 
     if (!token || !chatId) {
       resultDiv.className = 'mt-2 small text-warning';
-      resultDiv.textContent = '⚠️ Rellena el token y el chat ID antes de probar.';
+      resultDiv.textContent = '{{ i18n.config.js_fill_token }}';
       resultDiv.classList.remove('d-none');
       return;
     }
 
     resultDiv.className = 'mt-2 small text-muted';
-    resultDiv.textContent = 'Enviando…';
+    resultDiv.textContent = '{{ i18n.config.js_sending }}';
     resultDiv.classList.remove('d-none');
 
     try {
@@ -222,21 +259,21 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: chatId,
-          text: '✅ *RSS Tracker* — Conexión con Telegram confirmada.',
+          text: '✅ *RSS Tracker* — Connection confirmed.',
           parse_mode: 'Markdown',
         }),
       });
       const data = await resp.json();
       if (data.ok) {
         resultDiv.className = 'mt-2 small text-success';
-        resultDiv.textContent = '✅ Mensaje enviado correctamente.';
+        resultDiv.textContent = '{{ i18n.config.js_sent_ok }}';
       } else {
         resultDiv.className = 'mt-2 small text-danger';
-        resultDiv.textContent = '❌ Error: ' + (data.description || JSON.stringify(data));
+        resultDiv.textContent = '{{ i18n.config.js_sent_fail }} ' + (data.description || JSON.stringify(data));
       }
     } catch (err) {
       resultDiv.className = 'mt-2 small text-danger';
-      resultDiv.textContent = '❌ Error de red: ' + err.message;
+      resultDiv.textContent = '❌ Error: ' + err.message;
     }
   });
 </script>

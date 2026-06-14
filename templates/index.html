@@ -2,67 +2,47 @@
 {% block title %}Dashboard — RSS Tracker{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-  <div>
-    <h1 class="page-title mb-0">
-      <i class="bi bi-grid-fill text-accent me-2"></i>Dashboard
-    </h1>
-    <p class="small mb-0" style="color: #cbd5e1; font-weight: 400; opacity: 0.95;">
-      Monitoreo de feeds RSS activos &nbsp;|&nbsp; 
-      <i class="bi bi-clock-history me-1 text-accent"></i>Intervalo global: <strong>{{ global_cfg.check_interval or '60' }} min</strong> &nbsp;|&nbsp; 
-      <i class="bi bi-play-circle me-1 text-accent"></i>Próxima ejecución: <strong class="font-mono">{{ next_run }}</strong> &nbsp;|&nbsp; 
-      <button id="btnRunAllGlobal" class="btn btn-sm btn-link text-accent-hover text-muted-on-hover border-0 p-0 ms-2 text-decoration-none d-inline-flex align-items-center gap-1" 
-              onclick="runAllFeeds()" style="font-size: 0.78rem; vertical-align: baseline; transition: color 0.2s;" title="Comprobar todas las fuentes inmediatamente">
-        <i id="iconRunAllGlobal" class="bi bi-play-circle-fill text-accent"></i> Ejecutar ahora
-      </button>
-    </p>
-  </div>
-  <div class="d-flex align-items-center gap-3">
-    <div class="text-end">
-      <div class="small mb-1" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #cbd5e1; font-weight: 500;">Archivos enviados</div>
-      <div class="d-flex gap-2">
-        <span class="badge text-light fw-medium py-1 px-2" title="Últimas 24 horas" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;">
-          Día: <strong class="text-accent">{{ stats.sent_day }}</strong>
-        </span>
-        <span class="badge text-light fw-medium py-1 px-2" title="Últimos 7 días" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;">
-          Semana: <strong class="text-accent">{{ stats.sent_week }}</strong>
-        </span>
-        <span class="badge text-light fw-medium py-1 px-2" title="Últimos 30 días" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;">
-          Mes: <strong class="text-accent">{{ stats.sent_month }}</strong>
-        </span>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- Stats bar -->
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-rss"></i></div>
-      <div class="stat-value">{{ stats.total }}</div>
-      <div class="stat-label">Total Feeds</div>
+<div class="row g-2 g-md-3 mb-4 align-items-stretch">
+  <!-- 1. Active / Total -->
+  <div class="col-3">
+    <div class="stat-card h-100">
+      <div class="stat-icon text-accent"><i class="bi bi-rss"></i></div>
+      <div class="stat-value">{{ stats.active }} / {{ stats.total }}</div>
+      <div class="stat-label">{{ i18n.dashboard.stat_active_total }}</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-icon text-success"><i class="bi bi-check-circle"></i></div>
-      <div class="stat-value">{{ stats.active }}</div>
-      <div class="stat-label">Activos</div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-icon text-warning"><i class="bi bi-pause-circle"></i></div>
-      <div class="stat-value">{{ stats.inactive }}</div>
-      <div class="stat-label">Inactivos</div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
+  <!-- 2. Errors -->
+  <div class="col-3">
+    <div class="stat-card h-100">
       <div class="stat-icon text-danger"><i class="bi bi-exclamation-triangle"></i></div>
       <div class="stat-value">{{ stats.error }}</div>
-      <div class="stat-label">Con Errores</div>
+      <div class="stat-label">{{ i18n.dashboard.stat_errors }}</div>
+    </div>
+  </div>
+  <!-- 3. Items Archive -->
+  <div class="col-3">
+    <div class="stat-card h-100">
+      <div class="stat-icon text-primary"><i class="bi bi-archive"></i></div>
+      <div class="stat-value">{{ stats.total_items }}</div>
+      <div class="stat-label">{{ i18n.dashboard.stat_items_archive }}</div>
+    </div>
+  </div>
+  <!-- 4. Next Run & Run Button -->
+  <div class="col-3">
+    <div class="stat-card h-100">
+      <!-- Replaced static icon slot with interactive responsive button component -->
+      <div class="stat-icon mb-1 mb-md-2" style="height: auto;">
+        <button id="btnRunAllGlobal" class="btn btn-accent btn-sm px-2 py-0 shadow-sm d-inline-flex align-items-center justify-content-center gap-1" 
+                style="font-size: clamp(0.65rem, 0.75vw, 0.75rem); border-radius: 20px; font-weight: 700; border: none; vertical-align: top; margin-top: 2px;"
+                onclick="runAllFeeds()" title="{{ i18n.dashboard.run_all_title }}">
+           <i id="iconRunAllGlobal" class="bi bi-play-fill"></i>
+           <span class="d-none d-sm-inline">{{ i18n.dashboard.run_now }}</span>
+        </button>
+      </div>
+      <div class="stat-value">{{ next_run }}</div>
+      <div class="stat-label">{{ i18n.dashboard.next_run }}</div>
     </div>
   </div>
 </div>
@@ -70,8 +50,8 @@
 {% if not feeds %}
 <div class="empty-state">
   <i class="bi bi-inbox display-3 text-muted"></i>
-  <p class="mt-3 text-muted">No hay feeds configurados.<br>
-    <a href="/feeds/new">Añade el primero</a>.
+  <p class="mt-3 text-muted">{{ i18n.dashboard.no_feeds }}<br>
+    <a href="/feeds/new">{{ i18n.dashboard.add_first }}</a>.
   </p>
 </div>
 {% else %}
@@ -79,80 +59,107 @@
   <!-- Feeds table (Left Column) -->
   <div class="col-xl-8 col-lg-12">
     <div class="glass-card h-100">
-      <div class="table-responsive">
-        <table class="table align-middle mb-0">
-          <thead>
-            <tr>
-              <th style="width:2.5rem"></th>
-              <th>Nombre</th>
-              <th class="d-none d-lg-table-cell">Último item</th>
-              <th class="d-none d-lg-table-cell">Última ejecución</th>
-              <th class="d-none d-xl-table-cell">Estado</th>
-              <th class="text-end">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for feed in feeds %}
-            <tr class="feed-row {% if not feed.enabled %}opacity-50{% endif %}">
-              <td>
-                <span class="status-dot {% if feed.enabled %}dot-on{% else %}dot-off{% endif %}"
-                      title="{{ 'Activo' if feed.enabled else 'Inactivo' }}"></span>
-              </td>
-              <td>
-                <div class="fw-semibold">{{ feed.name }}</div>
-                <small class="text-muted text-truncate d-block" style="max-width:260px">{{ feed.url }}</small>
-                {% if feed.last_error %}
-                <small class="text-danger">
-                  <i class="bi bi-exclamation-circle me-1"></i>{{ feed.last_error[:80] }}…
-                </small>
-                {% endif %}
-              </td>
-              <td class="d-none d-lg-table-cell text-muted small">{{ feed.last_pub_date | fmt_dt }}</td>
-              <td class="d-none d-lg-table-cell text-muted small">{{ feed.last_run | fmt_dt }}</td>
-              <td class="d-none d-xl-table-cell">
-                {% if feed.consecutive_errors >= 3 %}
-                  <span class="badge bg-danger"><i class="bi bi-x-octagon me-1"></i>Error x{{ feed.consecutive_errors }}</span>
-                {% elif feed.consecutive_errors > 0 %}
-                  <span class="badge bg-warning text-dark"><i class="bi bi-exclamation me-1"></i>Aviso x{{ feed.consecutive_errors }}</span>
-                {% elif feed.enabled %}
-                  <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>OK</span>
-                {% else %}
-                  <span class="badge bg-secondary">Desactivado</span>
-                {% endif %}
-              </td>
-              <td class="text-end">
-                <div class="btn-group btn-group-sm" id="actions-{{ feed.id }}">
-                  <a href="/feeds/{{ feed.id }}/edit" class="btn btn-action btn-edit" title="Editar">
-                    <i class="bi bi-pencil"></i>
-                  </a>
-                  <button class="btn btn-action btn-run" title="Ejecutar ahora" onclick="runFeedNow({{ feed.id }})">
-                    <i class="bi bi-play-fill icon-run"></i>
-                  </button>
-                  <button class="btn btn-action btn-delete" title="Eliminar"
-                          onclick="confirmDelete({{ feed.id }}, '{{ feed.name | e }}')">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </div>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="px-3 py-2 border-bottom border-glass d-flex justify-content-between align-items-center" style="background: rgba(255,255,255,0.01); cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#feedsCollapse" aria-expanded="true">
+        <h6 class="mb-0 section-label" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em;">
+          <i class="bi bi-list-ul text-accent me-2"></i>{{ i18n.dashboard.feeds_title }}
+        </h6>
+        <i class="bi bi-chevron-down text-muted small chevron-toggle"></i>
+      </div>
+      <div id="feedsCollapse" class="collapse show">
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:2.5rem"></th>
+                <th>{{ i18n.dashboard.table_name }}</th>
+                <th class="d-none d-lg-table-cell">{{ i18n.dashboard.table_last_item }}</th>
+                <th class="d-none d-lg-table-cell">{{ i18n.dashboard.table_last_run }}</th>
+                <th class="d-none d-xl-table-cell">{{ i18n.dashboard.table_status }}</th>
+                <th class="text-end">{{ i18n.dashboard.table_actions }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for feed in feeds %}
+              <tr class="feed-row {% if not feed.enabled %}opacity-50{% endif %}">
+                <td>
+                  <span class="status-dot {% if feed.enabled %}dot-on{% else %}dot-off{% endif %}"
+                        title="{{ i18n.dashboard.status_active if feed.enabled else i18n.dashboard.status_inactive }}"></span>
+                </td>
+                <td>
+                  <div class="fw-semibold">{{ feed.name }}</div>
+                  <small class="text-muted text-truncate d-block" style="max-width:260px">{{ feed.url }}</small>
+                  {% if feed.last_error %}
+                  <small class="text-danger">
+                    <i class="bi bi-exclamation-circle me-1"></i>{{ feed.last_error[:80] }}…
+                  </small>
+                  {% endif %}
+                </td>
+                <td class="d-none d-lg-table-cell text-muted small">{{ feed.last_pub_date | fmt_dt }}</td>
+                <td class="d-none d-lg-table-cell text-muted small">{{ feed.last_run | fmt_dt }}</td>
+                <td class="d-none d-xl-table-cell">
+                  {% if feed.consecutive_errors >= 3 %}
+                    <span class="badge bg-danger"><i class="bi bi-x-octagon me-1"></i>Error x{{ feed.consecutive_errors }}</span>
+                  {% elif feed.consecutive_errors > 0 %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-exclamation me-1"></i>{{ i18n.dashboard.status_warning }} x{{ feed.consecutive_errors }}</span>
+                  {% elif feed.enabled %}
+                    <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>OK</span>
+                  {% else %}
+                    <span class="badge bg-secondary">{{ i18n.dashboard.status_disabled }}</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <div class="d-flex gap-1 justify-content-end" id="actions-{{ feed.id }}">
+                    <a href="/feeds/{{ feed.id }}/edit" class="btn btn-action btn-edit" title="{{ i18n.dashboard.action_edit }}">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    <button class="btn btn-action btn-run" title="{{ i18n.dashboard.action_run }}" onclick="runFeedNow({{ feed.id }})">
+                      <i class="bi bi-play-fill icon-run"></i>
+                    </button>
+                    <button class="btn btn-action btn-delete" title="{{ i18n.dashboard.action_delete }}"
+                            onclick="confirmDelete({{ feed.id }}, '{{ feed.name | e }}')">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Weekly Activity Chart (Right Column) -->
   <div class="col-xl-4 col-lg-12">
-    <div class="glass-card h-100 p-4 d-flex flex-column justify-content-between">
-      <div>
-        <h6 class="section-label mb-3" style="text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; font-size: 0.78rem;">
-          <i class="bi bi-activity text-accent me-2"></i>Actividad Semanal
+    <div class="glass-card h-100">
+      <div class="px-3 py-2 border-bottom border-glass d-flex justify-content-between align-items-center" style="background: rgba(255,255,255,0.01); cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#chartCollapse" aria-expanded="true">
+        <h6 class="mb-0 section-label" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em;">
+          <i class="bi bi-activity text-accent me-2"></i>{{ i18n.dashboard.weekly_activity }}
         </h6>
-        <p class="text-light small opacity-75 mb-4">Número de archivos enviados combinados en los últimos 7 días.</p>
+        <i class="bi bi-chevron-down text-muted small chevron-toggle"></i>
       </div>
-      <div style="position: relative; height: 170px; width: 100%;">
-        <canvas id="weeklyChart"></canvas>
+      <div id="chartCollapse" class="collapse show">
+        <div class="p-4">
+          <div style="position: relative; height: 170px; width: 100%;">
+            <canvas id="weeklyChart"></canvas>
+          </div>
+          <!-- Additional aggregate stats below chart -->
+          <div class="d-flex justify-content-between border-top border-glass mt-4 pt-3 text-center">
+            <div class="flex-grow-1">
+              <div class="text-muted mb-1" style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8;">{{ i18n.dashboard.stat_period_day }}</div>
+              <div class="fw-bold text-light" style="font-size: 1.2rem; letter-spacing: -0.3px;">{{ stats.sent_day }}</div>
+            </div>
+            <div class="flex-grow-1 border-start border-glass">
+              <div class="text-muted mb-1" style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8;">{{ i18n.dashboard.stat_period_week }}</div>
+              <div class="fw-bold text-light" style="font-size: 1.2rem; letter-spacing: -0.3px;">{{ stats.sent_week }}</div>
+            </div>
+            <div class="flex-grow-1 border-start border-glass">
+              <div class="text-muted mb-1" style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8;">{{ i18n.dashboard.stat_period_month }}</div>
+              <div class="fw-bold text-light" style="font-size: 1.2rem; letter-spacing: -0.3px;">{{ stats.sent_month }}</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -166,30 +173,29 @@
         <h6 class="mb-0 font-weight-bold d-flex align-items-center" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #e2e8f0;">
           <i class="bi bi-journal-text text-accent me-2" style="font-size: 1.1rem;"></i> 
           {% if q %}
-             Búsqueda: <span class="text-accent mx-1">"{{ q }}"</span> ({{ recent_items|length }})
+             {{ i18n.dashboard.history_search }}: <span class="text-accent mx-1">"{{ q }}"</span> ({{ recent_items|length }})
           {% else %}
-             Últimos {{ recent_items|length }} items registrados
+             {{ i18n.dashboard.history_latest }}
           {% endif %}
         </h6>
         <form method="GET" action="/#items-list" class="d-flex gap-0" style="width: auto; max-width: 320px;">
-          <div class="input-group input-group-sm">
-            <!-- Custom Border Style for uniform look: border-color is rgba(255,255,255,0.2) -->
-            <span class="input-group-text bg-black bg-opacity-25 text-muted rounded-0" 
+          <div class="input-group input-group-sm search-bar">
+            <span class="input-group-text bg-black bg-opacity-25 text-muted rounded-0 pe-1 ps-2" 
                   style="border: 1px solid rgba(255,255,255,0.2); border-right: none; border-radius: 0 !important;">
-              <i class="bi bi-search"></i>
+              <i class="bi bi-search" style="font-size: 0.8rem;"></i>
             </span>
             <input type="text" class="form-control form-control-sm bg-black bg-opacity-25 text-white rounded-0 ps-3" 
                    style="border: 1px solid rgba(255,255,255,0.2); border-left: none; border-right: none; border-radius: 0 !important; min-width: 150px;"
-                   name="q" value="{{ q }}" placeholder="Filtrar historial..." />
+                   name="q" value="{{ q }}" placeholder="{{ i18n.dashboard.history_filter_placeholder }}" />
             {% if q %}
               <a href="/#items-list" class="btn btn-sm btn-outline-secondary text-white bg-black bg-opacity-10 rounded-0 d-flex align-items-center justify-content-center px-2" 
-                 style="border: 1px solid rgba(255,255,255,0.2); border-left: none; border-right: none; border-radius: 0 !important;" title="Borrar">
+                 style="border: 1px solid rgba(255,255,255,0.2); border-left: none; border-right: none; border-radius: 0 !important;" title="{{ i18n.dashboard.history_clear }}">
                 <i class="bi bi-x-lg" style="font-size: 0.75rem;"></i>
               </a>
             {% endif %}
             <button class="btn btn-accent btn-sm px-3 rounded-0" type="submit" 
                     style="border: 1px solid rgba(255,255,255,0.2); border-left: none; border-radius: 0 !important;">
-              Buscar
+              {{ i18n.dashboard.history_search }}
             </button>
           </div>
         </form>
@@ -200,7 +206,7 @@
             {% if not recent_items %}
             <tr>
               <td class="text-center text-muted py-4">
-                <i class="bi bi-inbox-fill me-2 opacity-50"></i>No se han registrado envíos recientes.
+                <i class="bi bi-inbox-fill me-2 opacity-50"></i>{{ i18n.dashboard.history_empty }}
               </td>
             </tr>
             {% endif %}
@@ -208,7 +214,7 @@
             <tr class="feed-row" style="border-bottom: 1px solid rgba(255,255,255,0.03);">
               <td class="py-1 ps-3">
                 <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-accent fw-medium" title="{{ item.link }}" style="display: block; padding: 3px 0;">
-                  <span class="text-muted opacity-75">({{ acronym or feed_name }})</span> - {{ item.title or item.link }}
+                  <span class="{% if item.sent_at >= last_day %}text-success fw-bold{% else %}text-muted opacity-75{% endif %}">{{ acronym or feed_name }}</span> - {{ item.title or item.link }}
                 </a>
               </td>
             </tr>
@@ -226,17 +232,17 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content glass-modal">
       <div class="modal-header border-0">
-        <h5 class="modal-title"><i class="bi bi-trash text-danger me-2"></i>Confirmar eliminación</h5>
+        <h5 class="modal-title"><i class="bi bi-trash text-danger me-2"></i>{{ i18n.dashboard.delete_modal_title }}</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        ¿Seguro que quieres eliminar el feed <strong id="deleteFeedName"></strong>?
-        <p class="text-muted small mt-2 mb-0">Esta acción no se puede deshacer.</p>
+        {{ i18n.dashboard.delete_modal_confirm }} <strong id="deleteFeedName"></strong>?
+        <p class="text-muted small mt-2 mb-0">{{ i18n.dashboard.delete_modal_warning }}</p>
       </div>
       <div class="modal-footer border-0">
-        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">{{ i18n.dashboard.delete_modal_cancel }}</button>
         <form id="deleteForm" method="post">
-          <button type="submit" class="btn btn-danger">Eliminar</button>
+          <button type="submit" class="btn btn-danger">{{ i18n.dashboard.action_delete }}</button>
         </form>
       </div>
     </div>
@@ -274,8 +280,30 @@
   .text-muted-on-hover:hover {
     color: #fff !important;
   }
+  .chevron-toggle {
+    transition: transform 0.3s ease;
+  }
+  [aria-expanded="false"] .chevron-toggle {
+    transform: rotate(-90deg);
+  }
 </style>
 <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Auto-collapse cards on mobile/tablet stacks initally to save space
+    if (window.innerWidth < 992) { 
+      const fCollapse = document.getElementById('feedsCollapse');
+      const cCollapse = document.getElementById('chartCollapse');
+      if (fCollapse) {
+        fCollapse.classList.remove('show');
+        fCollapse.previousElementSibling.setAttribute('aria-expanded', 'false');
+      }
+      if (cCollapse) {
+        cCollapse.classList.remove('show');
+        cCollapse.previousElementSibling.setAttribute('aria-expanded', 'false');
+      }
+    }
+  });
+
   function confirmDelete(id, name) {
     document.getElementById('deleteFeedName').textContent = name;
     document.getElementById('deleteForm').action = `/feeds/${id}/delete`;
@@ -312,7 +340,7 @@
         // Reload to show new timestamp
         window.location.reload();
       } else {
-        alert('Error al ejecutar el feed.');
+        alert('{{ i18n.dashboard.js_error_run }}');
         // Re-enable
         if (btnEdit) {
           btnEdit.classList.remove('disabled');
@@ -324,7 +352,7 @@
       }
     } catch (err) {
       console.error(err);
-      alert('Error de red al ejecutar el feed.');
+      alert('{{ i18n.dashboard.js_error_network }}');
       if (btnEdit) {
         btnEdit.classList.remove('disabled');
         btnEdit.style.pointerEvents = 'auto';
@@ -355,7 +383,7 @@
         // Refresh on success
         window.location.reload();
       } else {
-        alert('Error al ejecutar la comprobación global.');
+        alert('{{ i18n.dashboard.js_error_global }}');
         btn.disabled = false;
         btn.style.pointerEvents = 'auto';
         btn.style.opacity = '1';
@@ -363,7 +391,7 @@
       }
     } catch (e) {
       console.error(e);
-      alert('Error de red al solicitar ejecución global.');
+      alert('{{ i18n.dashboard.js_error_global_net }}');
       btn.disabled = false;
       btn.style.pointerEvents = 'auto';
       btn.style.opacity = '1';
@@ -380,24 +408,45 @@
     const rawData = {{ stats.chart_data | tojson | safe }};
     const labels = rawData.map(item => item.day);
     const data = rawData.map(item => item.count);
+    
+    // Calculate cumulative running sum for the line dataset
+    let runningSum = 0;
+    const cumulativeData = data.map(val => {
+      runningSum += val;
+      return runningSum;
+    });
 
     new Chart(ctx, {
-      type: 'line',
+      type: 'bar',
       data: {
         labels: labels,
-        datasets: [{
-          label: 'Archivos enviados',
-          data: data,
-          borderColor: '#06b6d4', // accent cyan
-          backgroundColor: 'rgba(6, 182, 212, 0.12)', // subtle cyan fill
-          borderWidth: 2.5,
-          pointBackgroundColor: '#06b6d4',
-          pointBorderColor: '#ffffff',
-          pointHoverRadius: 6,
-          pointRadius: 4,
-          tension: 0.35, // smooth curved line
-          fill: true
-        }]
+        datasets: [
+          {
+            type: 'bar',
+            label: '{{ i18n.dashboard.chart_label_daily }}',
+            data: data,
+            backgroundColor: 'rgba(34, 211, 238, 0.25)', // cyber-cyan semi-trans
+            borderRadius: 4,
+            barThickness: 12,
+            borderWidth: 0,
+            order: 2 // ensures bars render behind the line
+          },
+          {
+            type: 'line',
+            label: '{{ i18n.dashboard.chart_label_cumulative }}',
+            data: cumulativeData,
+            borderColor: '#06b6d4', // accent cyan
+            backgroundColor: 'rgba(6, 182, 212, 0.08)', // very subtle background
+            borderWidth: 2.5,
+            pointBackgroundColor: '#06b6d4',
+            pointBorderColor: '#ffffff',
+            pointHoverRadius: 6,
+            pointRadius: 4,
+            tension: 0.35, // smooth curved line
+            fill: true,
+            order: 1 // ensures line renders above the bars
+          }
+        ]
       },
       options: {
         responsive: true,
@@ -416,7 +465,11 @@
             displayColors: false,
             callbacks: {
               label: function(context) {
-                return `${context.parsed.y} archivos`;
+                let label = context.dataset.label || '';
+                if (label) {
+                    label += ': ';
+                }
+                return label + context.parsed.y + ' {{ i18n.dashboard.chart_files }}';
               }
             }
           }

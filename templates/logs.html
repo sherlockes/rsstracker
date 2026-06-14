@@ -1,28 +1,28 @@
 {% extends "base.html" %}
 
-{% block title %}Registros del Sistema - RSS Tracker{% endblock %}
+{% block title %}{{ i18n.logs.title }} - RSS Tracker{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h1 class="page-title mb-1"><i class="bi bi-terminal-fill text-accent me-2"></i>Registros del Sistema</h1>
-    <p class="text-muted mb-0">Últimas {{ lines }} líneas del archivo de depuración.</p>
+    <h1 class="page-title mb-1"><i class="bi bi-terminal-fill text-accent me-2"></i>{{ i18n.logs.title }}</h1>
+    <p class="text-muted mb-0">{{ i18n.logs.subtitle.format(count=lines) }}</p>
   </div>
   <div class="d-flex gap-2">
     <form action="/logs" method="GET" class="d-flex gap-2">
         <select name="lines" class="form-select form-select-sm" style="width: 120px;" onchange="this.form.submit()">
-            <option value="100" {% if lines == 100 %}selected{% endif %}>100 líneas</option>
-            <option value="500" {% if lines == 500 %}selected{% endif %}>500 líneas</option>
-            <option value="1000" {% if lines == 1000 %}selected{% endif %}>1000 líneas</option>
-            <option value="2000" {% if lines == 2000 %}selected{% endif %}>2000 líneas</option>
+            <option value="100" {% if lines == 100 %}selected{% endif %}>100 {{ i18n.logs.lines }}</option>
+            <option value="500" {% if lines == 500 %}selected{% endif %}>500 {{ i18n.logs.lines }}</option>
+            <option value="1000" {% if lines == 1000 %}selected{% endif %}>1000 {{ i18n.logs.lines }}</option>
+            <option value="2000" {% if lines == 2000 %}selected{% endif %}>2000 {{ i18n.logs.lines }}</option>
         </select>
     </form>
     <button class="btn btn-sm btn-outline-secondary" onclick="window.location.reload()">
-        <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+        <i class="bi bi-arrow-clockwise me-1"></i>{{ i18n.logs.refresh }}
     </button>
-    <form action="/logs/clear" method="POST" onsubmit="return confirm('¿Estás seguro de que quieres vaciar los registros?');">
+    <form action="/logs/clear" method="POST" onsubmit="return confirm('{{ i18n.logs.js_confirm_clear }}');">
         <button type="submit" class="btn btn-sm btn-outline-danger">
-            <i class="bi bi-trash3 me-1"></i>Limpiar
+            <i class="bi bi-trash3 me-1"></i>{{ i18n.logs['clear'] }}
         </button>
     </form>
   </div>

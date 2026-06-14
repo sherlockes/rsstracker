@@ -156,8 +156,14 @@ main { flex: 1; }
 
 /* ---- Table ---- */
 .table {
-  color: var(--text-primary);
-  border-color: var(--border-glass);
+  --bs-table-bg: transparent !important;
+  --bs-table-color: var(--text-primary) !important;
+  --bs-table-border-color: var(--border-glass) !important;
+  --bs-table-striped-bg: transparent !important;
+  --bs-table-accent-bg: transparent !important;
+  --bs-table-hover-bg: var(--bg-card-hover) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-glass) !important;
   margin-bottom: 0;
 }
 
@@ -296,7 +302,17 @@ main { flex: 1; }
   outline: none;
 }
 
+.form-select option {
+  background-color: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+}
+
 .form-control::placeholder { color: var(--text-muted) !important; }
+
+input[type="number"] {
+  min-width: 120px; /* Ensures ample horizontal space for larger numbers (e.g. 20000) */
+  padding-right: 2rem !important; /* Leaves space so incrementers won't clip the numbers */
+}
 
 .form-label { font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.4rem; }
 .form-text  { font-size: 0.78rem; color: var(--text-muted); }
@@ -360,4 +376,24 @@ main { flex: 1; }
 @media (max-width: 768px) {
   .page-title { font-size: 1.2rem; }
   .glass-card { border-radius: 10px; }
+  
+  /* Stat cards resizing for single row constraint */
+  .stat-card { padding: 0.75rem 0.25rem; }
+  .stat-icon { font-size: 1.1rem; margin-bottom: 0.15rem; }
+  .stat-value { font-size: 1.1rem; letter-spacing: -0.5px; }
+  .stat-label { 
+    font-size: 0.6rem; 
+    margin-top: 0.15rem; 
+    letter-spacing: 0; 
+    line-height: 1.1; 
+    opacity: 0.9;
+  }
+}
+
+/* Extra small mobile optimization */
+@media (max-width: 420px) {
+  .stat-card { padding: 0.5rem 0.15rem; }
+  .stat-icon { font-size: 0.95rem; }
+  .stat-value { font-size: 0.9rem; }
+  .stat-label { font-size: 0.52rem; }
 }

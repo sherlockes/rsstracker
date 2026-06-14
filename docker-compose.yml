@@ -3,13 +3,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      network: host          # Usa la red del host durante el build
-    container_name: rsstracker2telegram
+      network: host
+    container_name: rsstracker
     restart: unless-stopped
     ports:
-      - "8765:8000"
+      # 🔒 Atados exclusivamente a tu IP de ZeroTier:
+      - "192.168.191.220:8765:8000" 
     volumes:
-      - ./data:/app/data     # SQLite DB persisted on host
+      - ./data:/app/data
     environment:
       - TZ=Europe/Madrid
     healthcheck:
@@ -18,3 +19,9 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
