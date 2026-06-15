@@ -74,6 +74,56 @@
             {{ i18n.config.run_on_startup_help }}
           </div>
         </div>
+
+        <!-- OpenRouter Settings -->
+        <hr class="border-secondary my-4" />
+        <div class="mb-3 d-flex align-items-center gap-2">
+          <i class="bi bi-cpu fs-5 text-accent"></i>
+          <h6 class="mb-0 fw-semibold">OpenRouter (IA)</h6>
+        </div>
+
+        <!-- OpenRouter API Key -->
+        <div class="mb-4">
+          <label for="openrouter_api_key" class="form-label">{{ i18n.config.openrouter_key }}</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-key-fill"></i></span>
+            <input type="password" class="form-control font-mono" id="openrouter_api_key" name="openrouter_api_key"
+                   value="{{ global_cfg.openrouter_api_key or '' }}"
+                   placeholder="sk-or-v1-..." autocomplete="off" />
+            <button class="btn btn-outline-secondary" type="button" id="btnShowORKey"
+                    onclick="toggleVisibility('openrouter_api_key', this)">
+              <i class="bi bi-eye"></i>
+            </button>
+          </div>
+          <div class="form-text">
+            {{ i18n.config.openrouter_key_help }}
+          </div>
+        </div>
+
+        <!-- OpenRouter Model -->
+        <div class="mb-2">
+          <label for="openrouter_model" class="form-label">{{ i18n.config.openrouter_model }}</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-robot"></i></span>
+            <input type="text" class="form-control font-mono" id="openrouter_model" name="openrouter_model"
+                   value="{{ global_cfg.openrouter_model or 'meta-llama/llama-3-8b-instruct' }}" required />
+          </div>
+          <div class="form-text">
+            {{ i18n.config.openrouter_model_help }}
+          </div>
+        </div>
+
+        <!-- Sync History Enabled -->
+        <div class="mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="sync_history_enabled" name="sync_history_enabled"
+                   value="true" {{ 'checked' if global_cfg.sync_history_enabled == 'true' else '' }} />
+            <label class="form-check-label fw-semibold" for="sync_history_enabled">{{ i18n.config.sync_history_enabled }}</label>
+          </div>
+          <div class="form-text">
+            {{ i18n.config.sync_history_enabled_help }}
+          </div>
+        </div>
       </div>
     </div>
 
@@ -213,6 +263,26 @@
           </div>
         </div>
       </div>
+      
+      <div class="row g-4 mt-2">
+        <!-- Historical Sync -->
+        <div class="col-12">
+          <div class="p-3 rounded bg-white bg-opacity-10">
+            <label class="form-label fw-semibold mb-1">
+              <i class="bi bi-cpu me-2"></i>{{ i18n.config.sync_history_title }}
+            </label>
+            <p class="text-light small mb-3 opacity-75">
+              {{ i18n.config.sync_history_desc }}
+            </p>
+            <div class="d-flex align-items-center gap-3">
+              <button type="button" class="btn btn-outline-accent btn-sm" id="btnSyncHistory" style="min-width: 200px;">
+                <i class="bi bi-arrow-repeat me-2"></i>{{ i18n.config.sync_history_btn }}
+              </button>
+              <span id="syncStatusMsg" class="small d-none"></span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -276,5 +346,34 @@
       resultDiv.textContent = '❌ Error: ' + err.message;
     }
   });
+
+  const btnSyncHistory = document.getElementById('btnSyncHistory');
+  if (btnSyncHistory) {
+    btnSyncHistory.addEventListener('click', async () => {
+      const statusMsg = document.getElementById('syncStatusMsg');
+      
+      btnSyncHistory.disabled = true;
+      statusMsg.className = 'small text-muted';
+      statusMsg.textContent = '{{ i18n.config.js_sync_in_progress }}';
+      statusMsg.classList.remove('d-none');
+      
+      try {
+        const resp = await fetch('/api/sync-history', { method: 'POST' });
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+          statusMsg.className = 'small text-success';
+          statusMsg.textContent = `{{ i18n.config.js_sync_success }} (${data.synced} items)`;
+        } else {
+          statusMsg.className = 'small text-danger';
+          statusMsg.textContent = `{{ i18n.config.js_sync_failed }}: ` + (data.error || 'Unknown error');
+        }
+      } catch (err) {
+        statusMsg.className = 'small text-danger';
+        statusMsg.textContent = '❌ Error: ' + err.message;
+      } finally {
+        btnSyncHistory.disabled = false;
+      }
+    });
+  }
 </script>
 {% endblock %}

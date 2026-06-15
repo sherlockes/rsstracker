@@ -29,7 +29,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from models import Feed, GlobalConfig, SentItem, SessionLocal, init_db
+from models import Feed, GlobalConfig, SentItem, SessionLocal, init_db, SessionLocalHistorico, Serie, Enlace
 from scheduler import (
     reschedule_all_feeds,
     reschedule_feed,
@@ -39,6 +39,8 @@ from scheduler import (
     start_scheduler,
     stop_scheduler,
     test_regex,
+    parse_dirty_title_on_the_fly,
+    sync_historical_db_job,
 )
 from translations import get_lang
 
@@ -97,8 +99,14 @@ async def lifespan(app: FastAPI):
             import threading
             from scheduler import run_all_feeds_job
             threading.Thread(target=run_all_feeds_job, daemon=True).start()
+
+        # Always trigger database alignment (sync/restore) on startup in background
+        import threading
+        from scheduler import sync_historical_db_job
+        logger.info("Triggering database alignment (archive sync/restore) on startup.")
+        threading.Thread(target=sync_historical_db_job, kwargs={"force": True}, daemon=True).start()
     except Exception as exc:
-        logger.error("Error triggering startup poll: %s", exc)
+        logger.error("Error during startup triggers: %s", exc)
     finally:
         db.close()
         
@@ -219,12 +227,35 @@ async def dashboard(request: Request, db: DB, q: Optional[str] = None):
         day_name = weekdays[weekday_idx]
         chart_data.append({"day": day_name, "count": count})
 
+    # Count of archived items
+    db_hist = SessionLocalHistorico()
+    try:
+        archive_count = db_hist.query(Enlace).count()
+    except Exception as e:
+        logger.error("Error query archive count for dashboard: %s", e)
+        archive_count = 0
+    finally:
+        db_hist.close()
+
+    def format_k(val: int) -> str:
+        if val == 0:
+            return "0"
+        divided = val / 1000
+        if val % 1000 == 0:
+            return f"{int(divided)}k"
+        else:
+            return f"{divided:.1f}k"
+
+    archive_value = f"{format_k(total_items)} / {format_k(archive_count)}"
+
     stats = {
         "total": len(feeds),
         "active": sum(1 for f in feeds if f.enabled),
         "inactive": sum(1 for f in feeds if not f.enabled),
         "error": sum(1 for f in feeds if (f.consecutive_errors or 0) > 0),
         "total_items": total_items,
+        "archive_count": archive_count,
+        "archive_value": archive_value,
         "sent_day": sent_day,
         "sent_week": sent_week,
         "sent_month": sent_month,
@@ -444,8 +475,12 @@ async def config_save(
     silent_mode_end: str = Form(""),
     run_on_startup: bool = Form(False),
     language: str = Form("en"),
+    openrouter_api_key: str = Form(""),
+    openrouter_model: str = Form("qwen/qwen3.6-35b-a3b"),
+    sync_history_enabled: bool = Form(False),
 ):
     run_on_startup_val = "true" if run_on_startup else "false"
+    sync_history_enabled_val = "true" if sync_history_enabled else "false"
     for key, value in [
         ("telegram_token", telegram_token),
         ("chat_id", chat_id),
@@ -456,6 +491,9 @@ async def config_save(
         ("silent_mode_end", silent_mode_end),
         ("run_on_startup", run_on_startup_val),
         ("language", language),
+        ("openrouter_api_key", openrouter_api_key.strip()),
+        ("openrouter_model", openrouter_model.strip()),
+        ("sync_history_enabled", sync_history_enabled_val),
     ]:
         row = db.get(GlobalConfig, key)
         if row:
@@ -600,4 +638,201 @@ async def api_fetch_feed_items(url: str):
         return JSONResponse({"items": items, "error": None})
     except Exception as exc:
         return JSONResponse({"items": [], "error": str(exc)})
+
+
+# --------------------------------------------------------------------------- #
+# Series Finder API & Manual Sync                                              #
+# --------------------------------------------------------------------------- #
+
+@app.get("/api/series/search")
+async def api_search_series(db: DB, q: str = ""):
+    if not q or len(q.strip()) < 2:
+        return []
+    
+    q_clean = q.strip()
+    
+    # 1. Search in historical database
+    db_hist = SessionLocalHistorico()
+    hist_series = []
+    try:
+        hist_rows = db_hist.query(Serie).filter(Serie.nombre_limpio.ilike(f"%{q_clean}%")).all()
+        hist_series = [row.nombre_limpio for row in hist_rows]
+    except Exception as e:
+        logger.error("Error al buscar en base de datos histórica: %s", e)
+    finally:
+        db_hist.close()
+        
+    # 2. Search in active database
+    active_series = set()
+    try:
+        active_rows = db.query(SentItem).filter(SentItem.title.ilike(f"%{q_clean}%")).all()
+        for row in active_rows:
+            parsed = parse_dirty_title_on_the_fly(row.title or "")
+            if q_clean.lower() in parsed["serie_limpia"].lower():
+                active_series.add(parsed["serie_limpia"])
+    except Exception as e:
+        logger.error("Error al buscar en base de datos activa: %s", e)
+        
+    # Merge and deduplicate
+    all_names = set(hist_series) | active_series
+    sorted_names = sorted(list(all_names))
+    return [{"name": name} for name in sorted_names]
+
+
+@app.get("/api/series/seasons")
+async def api_series_seasons(name: str, db: DB):
+    if not name:
+        return []
+        
+    seasons = set()
+    
+    # 1. Seasons from historical database
+    db_hist = SessionLocalHistorico()
+    try:
+        serie = db_hist.query(Serie).filter(Serie.nombre_limpio == name).first()
+        if serie:
+            rows = db_hist.query(Enlace.temporada).filter(Enlace.serie_id == serie.id).distinct().all()
+            for r in rows:
+                seasons.add(r[0])
+    except Exception as e:
+        logger.error("Error al obtener temporadas del histórico: %s", e)
+    finally:
+        db_hist.close()
+        
+    # 2. Seasons from active database
+    try:
+        matching_items = db.query(SentItem).filter(SentItem.title.ilike(f"%{name}%")).all()
+        for item in matching_items:
+            parsed = parse_dirty_title_on_the_fly(item.title or "")
+            if parsed["serie_limpia"].lower() == name.lower():
+                seasons.add(parsed["temporada"])
+    except Exception as e:
+        logger.error("Error al obtener temporadas de activa: %s", e)
+        
+    # Sort with None (specials/no season) handled properly
+    sorted_seasons = []
+    has_null = False
+    for s in seasons:
+        if s is None:
+            has_null = True
+        else:
+            sorted_seasons.append(s)
+    sorted_seasons.sort()
+    
+    # Return formatted list
+    result = []
+    for s in sorted_seasons:
+        result.append({"value": s, "label": str(s)})
+    if has_null:
+        result.append({"value": "null", "label": "null"})
+        
+    return result
+
+
+@app.get("/api/series/episodes")
+async def api_series_episodes(name: str, db: DB, season: str = None):
+    if not name:
+        return []
+        
+    episodes = []
+    
+    # 1. Episodes from historical DB
+    db_hist = SessionLocalHistorico()
+    try:
+        serie = db_hist.query(Serie).filter(Serie.nombre_limpio == name).first()
+        if serie:
+            query = db_hist.query(Enlace).filter(Enlace.serie_id == serie.id)
+            if season is not None:
+                if season == "null":
+                    query = query.filter(Enlace.temporada.is_(None))
+                else:
+                    try:
+                        s_val = int(season)
+                        query = query.filter(Enlace.temporada == s_val)
+                    except ValueError:
+                        pass
+                
+            enlaces = query.all()
+            for e in enlaces:
+                episodes.append({
+                    "temporada": e.temporada,
+                    "episodio": e.episodio,
+                    "texto_original": e.texto_original,
+                    "url": e.url,
+                    "source": "historial",
+                    "feed_acronym": e.feed_acronym or ""
+                })
+    except Exception as e:
+        logger.error("Error al obtener episodios del histórico: %s", e)
+    finally:
+        db_hist.close()
+        
+    # 2. Episodes from active DB (unprocessed)
+    try:
+        matching_items = db.query(SentItem, Feed.acronym, Feed.name).join(Feed, SentItem.feed_id == Feed.id).filter(SentItem.title.ilike(f"%{name}%")).all()
+        for item, acronym, feed_name in matching_items:
+            parsed = parse_dirty_title_on_the_fly(item.title or "")
+            if parsed["serie_limpia"].lower() == name.lower():
+                # If season is specified, filter by it
+                match_season = True
+                if season is not None:
+                    if season == "null":
+                        match_season = (parsed["temporada"] is None)
+                    else:
+                        try:
+                            s_val = int(season)
+                            match_season = (parsed["temporada"] == s_val)
+                        except ValueError:
+                            pass
+                
+                if match_season:
+                    episodes.append({
+                        "temporada": parsed["temporada"],
+                        "episodio": parsed["episodio"],
+                        "texto_original": parsed["texto_original"],
+                        "url": item.link,
+                        "source": "reciente",
+                        "feed_acronym": acronym or feed_name[:4]
+                    })
+    except Exception as e:
+        logger.error("Error al obtener episodios de activa: %s", e)
+        
+    # Sort episodes by season and then episode. Specials/null season go first.
+    def sort_key(x):
+        t = x.get("temporada")
+        ep = x.get("episodio")
+        t_val = 0 if t is None else t
+        ep_val = -1 if ep is None else ep
+        return (t_val, ep_val, x["texto_original"])
+        
+    episodes.sort(key=sort_key)
+    return episodes
+
+
+@app.post("/api/sync-history")
+async def api_sync_history():
+    from fastapi.concurrency import run_in_threadpool
+    try:
+        synced = await run_in_threadpool(sync_historical_db_job, force=True)
+        return {"success": True, "synced": synced}
+    except Exception as exc:
+        logger.error("Error manual trigger sync: %s", exc)
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=500)
+
+
+@app.post("/api/clear-historical-db")
+async def api_clear_historical_db():
+    db_hist = SessionLocalHistorico()
+    try:
+        db_hist.query(Enlace).delete()
+        db_hist.query(Serie).delete()
+        db_hist.commit()
+        logger.info("Base de datos histórica vaciada por petición del usuario.")
+        return {"success": True, "message": "Historical DB cleared"}
+    except Exception as e:
+        db_hist.rollback()
+        logger.error("Error al vaciar base de datos histórica: %s", e)
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+    finally:
+        db_hist.close()
 

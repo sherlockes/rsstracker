@@ -25,7 +25,7 @@
   <div class="col-3">
     <div class="stat-card h-100">
       <div class="stat-icon text-primary"><i class="bi bi-archive"></i></div>
-      <div class="stat-value">{{ stats.total_items }}</div>
+      <div class="stat-value">{{ stats.archive_value }}</div>
       <div class="stat-label">{{ i18n.dashboard.stat_items_archive }}</div>
     </div>
   </div>
@@ -165,6 +165,74 @@
   </div>
 </div>
 
+{% if stats.archive_count > 0 %}
+<!-- Buscador en Cascada de Series (Histórico + Reciente) -->
+<div class="row g-4 mt-2">
+  <div class="col-12">
+    <div class="glass-card overflow-hidden">
+      <div class="px-3 py-2 border-bottom border-glass d-flex justify-content-between align-items-center" style="background: rgba(255,255,255,0.01); cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#finderCollapse" aria-expanded="false">
+        <h6 class="mb-0 section-label" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em;">
+          <i class="bi bi-search-heart text-accent me-2"></i>{{ i18n.dashboard.series_finder_title }} ({{ stats.archive_count }})
+        </h6>
+        <i class="bi bi-chevron-down text-muted small chevron-toggle"></i>
+      </div>
+      <div id="finderCollapse" class="collapse">
+        <div class="p-3">
+        <div class="row g-3">
+          <!-- Buscador de Serie -->
+          <div class="col-md-10 position-relative">
+            <label for="seriesSearchInput" class="form-label">{{ i18n.dashboard.series_finder_select_series }}</label>
+            <div class="input-group">
+              <span class="input-group-text bg-black bg-opacity-25 text-muted"><i class="bi bi-search"></i></span>
+              <input type="text" id="seriesSearchInput" class="form-control" placeholder="{{ i18n.dashboard.series_finder_search_placeholder }}" autocomplete="off" />
+            </div>
+            <!-- Lista desplegable de resultados -->
+            <div id="seriesSearchResults" class="list-group position-absolute w-100 shadow-lg mt-1 overflow-y-auto" style="max-height: 250px; z-index: 1000; display: none; border: 1px solid var(--border-glass); border-radius: var(--radius-sm); background: var(--bg-surface);">
+              <!-- Rellenado con Javascript -->
+            </div>
+          </div>
+
+          <!-- Botón de Limpiar -->
+          <div class="col-md-2 d-flex align-items-end">
+            <button id="btnClearFinder" class="btn btn-outline-secondary w-100 py-2" type="button">
+              <i class="bi bi-x-circle me-1"></i>{{ i18n.dashboard.history_clear }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Resultados de Episodios -->
+        <div id="finderEpisodesContainer" class="mt-4" style="display: none;">
+          <h6 class="border-bottom border-glass pb-2 text-accent" style="font-size: 0.82rem; font-weight: 600; letter-spacing: 0.05em;">
+            <i class="bi bi-list-stars me-1"></i><span id="finderTitleText"></span>
+          </h6>
+          <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-sm align-middle mb-0" style="font-size: 0.82rem;">
+              <thead>
+                <tr>
+                  <th style="width: 15%">Origen RSS</th>
+                  <th style="width: 55%">{{ i18n.dashboard.table_name }}</th>
+                  <th style="width: 15%">Origen</th>
+                  <th style="width: 15%" class="text-end">Link</th>
+                </tr>
+              </thead>
+              <tbody id="finderEpisodesBody">
+                <!-- Rellenado con Javascript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Mensaje Inicial -->
+        <div id="finderPromptMessage" class="text-center text-muted py-4 small">
+          <i class="bi bi-info-circle me-2"></i>{{ i18n.dashboard.series_finder_select_prompt }}
+        </div>
+      </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- Recent Items Table (Full Width Row) -->
 <div class="row g-4 mt-2" id="items-list">
   <div class="col-12">
@@ -175,7 +243,7 @@
           {% if q %}
              {{ i18n.dashboard.history_search }}: <span class="text-accent mx-1">"{{ q }}"</span> ({{ recent_items|length }})
           {% else %}
-             {{ i18n.dashboard.history_latest }}
+             {{ i18n.dashboard.history_latest }} <span class="text-muted ms-2" style="font-size: 0.75rem; text-transform: none; font-weight: normal;">({{ stats.total_items }} / {{ global_cfg.history_limit_total }})</span>
           {% endif %}
         </h6>
         <form method="GET" action="/#items-list" class="d-flex gap-0" style="width: auto; max-width: 320px;">
@@ -397,6 +465,152 @@
       btn.style.opacity = '1';
       icon.className = oldHTML;
     }
+  }
+
+  // --- Series Finder Cascading System ---
+  let selectedSeriesName = "";
+
+  const seriesSearchInput = document.getElementById('seriesSearchInput');
+  const seriesSearchResults = document.getElementById('seriesSearchResults');
+  const btnClearFinder = document.getElementById('btnClearFinder');
+  const finderEpisodesContainer = document.getElementById('finderEpisodesContainer');
+  const finderPromptMessage = document.getElementById('finderPromptMessage');
+  const finderTitleText = document.getElementById('finderTitleText');
+  const finderEpisodesBody = document.getElementById('finderEpisodesBody');
+
+  // Debounce helper
+  function debounce(func, delay) {
+    let timeout;
+    return function (...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), delay);
+    };
+  }
+
+  // Trigger search on input typing (with 350ms debounce)
+  if (seriesSearchInput) {
+    seriesSearchInput.addEventListener('input', debounce(async function(e) {
+      const q = e.target.value.trim();
+      if (q.length < 2) {
+        seriesSearchResults.style.display = 'none';
+        return;
+      }
+
+      try {
+        const resp = await fetch(`/api/series/search?q=${encodeURIComponent(q)}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          renderSeriesSearchResults(data);
+        }
+      } catch (err) {
+        console.error("Error searching series:", err);
+      }
+    }, 350));
+
+    // Hide search results if clicked outside
+    document.addEventListener('click', function(e) {
+      if (seriesSearchInput && !seriesSearchInput.contains(e.target) && !seriesSearchResults.contains(e.target)) {
+        seriesSearchResults.style.display = 'none';
+      }
+    });
+  }
+
+  function renderSeriesSearchResults(data) {
+    seriesSearchResults.innerHTML = "";
+    if (data.length === 0) {
+      const emptyItem = document.createElement('div');
+      emptyItem.className = 'list-group-item text-muted small p-3 text-center';
+      emptyItem.textContent = '{{ i18n.dashboard.series_finder_no_results }}';
+      seriesSearchResults.appendChild(emptyItem);
+      seriesSearchResults.style.display = 'block';
+      return;
+    }
+
+    data.forEach(item => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'list-group-item list-group-item-action text-white bg-dark border-secondary p-2 small text-start';
+      btn.style.background = 'rgba(15,23,42,0.95)';
+      btn.textContent = item.name;
+      btn.addEventListener('click', () => selectSeries(item.name));
+      seriesSearchResults.appendChild(btn);
+    });
+    seriesSearchResults.style.display = 'block';
+  }
+
+  async function selectSeries(name) {
+    selectedSeriesName = name;
+    if (seriesSearchInput) seriesSearchInput.value = name;
+    seriesSearchResults.style.display = 'none';
+    
+    // Hide episodes grid
+    if (finderEpisodesContainer) finderEpisodesContainer.style.display = 'none';
+    if (finderPromptMessage) finderPromptMessage.style.display = 'block';
+
+    try {
+      const resp = await fetch(`/api/series/episodes?name=${encodeURIComponent(name)}`);
+      if (resp.ok) {
+        const episodes = await resp.json();
+        if (finderPromptMessage) finderPromptMessage.style.display = 'none';
+        renderEpisodes(episodes);
+      }
+    } catch (err) {
+      console.error("Error fetching episodes:", err);
+    }
+  }
+
+  function renderEpisodes(episodes) {
+    if (!finderEpisodesBody || !finderEpisodesContainer || !finderTitleText) return;
+    
+    finderEpisodesBody.innerHTML = "";
+    finderTitleText.textContent = selectedSeriesName;
+
+    if (episodes.length === 0) {
+      const row = document.createElement('tr');
+      row.innerHTML = `<td colspan="4" class="text-center text-muted py-3">No episodes found.</td>`;
+      finderEpisodesBody.appendChild(row);
+      finderEpisodesContainer.style.display = 'block';
+      return;
+    }
+
+    episodes.forEach(e => {
+      const row = document.createElement('tr');
+      row.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
+      
+      // Feed acronym label
+      let feedLabel = e.feed_acronym ? `<span class="badge bg-secondary font-mono" style="font-size: 0.72rem; border: 1px solid rgba(255,255,255,0.15);">${e.feed_acronym}</span>` : '—';
+
+      // Source label
+      let sourceLabel = "";
+      if (e.source === "historial") {
+        sourceLabel = `<span class="badge bg-primary" style="font-size: 0.68rem; padding: 3px 6px;">{{ i18n.dashboard.series_finder_source_hist }}</span>`;
+      } else {
+        sourceLabel = `<span class="badge bg-warning text-dark" style="font-size: 0.68rem; padding: 3px 6px;">{{ i18n.dashboard.series_finder_source_act }}</span>`;
+      }
+
+      row.innerHTML = `
+        <td class="py-2 fw-medium">${feedLabel}</td>
+        <td class="py-2 text-light text-wrap" style="max-width: 250px;">${e.texto_original}</td>
+        <td class="py-2">${sourceLabel}</td>
+        <td class="py-2 text-end">
+          <a href="${e.url}" target="_blank" rel="noopener noreferrer" class="btn btn-action btn-sm px-2 py-1" title="${e.url}">
+            <i class="bi bi-box-arrow-up-right"></i>
+          </a>
+        </td>
+      `;
+      finderEpisodesBody.appendChild(row);
+    });
+
+    finderEpisodesContainer.style.display = 'block';
+  }
+
+  if (btnClearFinder) {
+    btnClearFinder.addEventListener('click', () => {
+      selectedSeriesName = "";
+      if (seriesSearchInput) seriesSearchInput.value = "";
+      if (finderEpisodesContainer) finderEpisodesContainer.style.display = 'none';
+      if (finderPromptMessage) finderPromptMessage.style.display = 'block';
+    });
   }
 </script>
 

@@ -12,6 +12,8 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    ForeignKey,
+    Index,
 )
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -27,6 +29,49 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 class Base(DeclarativeBase):
     pass
+
+
+# --- Historical Database Configuration ---------------------------------------
+HISTORICO_DATABASE_URL = "sqlite:///./data/historico.db"
+
+engine_historico = create_engine(
+    HISTORICO_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+)
+
+SessionLocalHistorico = sessionmaker(autocommit=False, autoflush=False, bind=engine_historico)
+
+
+class BaseHistorico(DeclarativeBase):
+    pass
+
+
+class Serie(BaseHistorico):
+    """Represents a clean TV show series name in the historical DB."""
+
+    __tablename__ = "Series"
+
+    id: int = Column(Integer, primary_key=True, autoincrement=True)
+    nombre_limpio: str = Column(String(255), unique=True, nullable=False, index=True)
+
+
+class Enlace(BaseHistorico):
+    """Represents a parsed link corresponding to a season and episode of a series."""
+
+    __tablename__ = "Enlaces"
+
+    id: int = Column(Integer, primary_key=True, autoincrement=True)
+    serie_id: int = Column(Integer, ForeignKey("Series.id"), nullable=False, index=True)
+    temporada: int | None = Column(Integer, nullable=True)
+    episodio: int | None = Column(Integer, nullable=True)
+    texto_original: str = Column(Text, nullable=False)
+    url: str = Column(Text, nullable=False)
+    feed_acronym: str | None = Column(String(50), nullable=True)
+
+    __table_args__ = (
+        Index("idx_enlaces_busqueda", "serie_id", "temporada", "episodio"),
+    )
+
 
 
 class Feed(Base):
@@ -87,6 +132,7 @@ class SentItem(Base):
 def init_db() -> None:
     """Create all tables and seed default config if needed."""
     Base.metadata.create_all(bind=engine)
+    BaseHistorico.metadata.create_all(bind=engine_historico)
     
     # Automatic migration for 'title' column in 'sent_items'
     import sqlite3
@@ -114,22 +160,44 @@ def init_db() -> None:
     finally:
         conn.close()
 
+    # Automatic migration for 'feed_acronym' column in 'Enlaces' of historico.db
+    try:
+        conn_hist = sqlite3.connect("./data/historico.db")
+        cursor_hist = conn_hist.cursor()
+        cursor_hist.execute("PRAGMA table_info(Enlaces)")
+        enlaces_columns = [row[1] for row in cursor_hist.fetchall()]
+        if "feed_acronym" not in enlaces_columns:
+            cursor_hist.execute("ALTER TABLE Enlaces ADD COLUMN feed_acronym TEXT")
+            conn_hist.commit()
+    except Exception:
+        pass
+    finally:
+        conn_hist.close()
     db = SessionLocal()
     try:
-        for key in ("telegram_token", "chat_id", "check_interval", "max_items_per_message", "silent_mode_start", "silent_mode_end", "run_on_startup", "language"):
-            if not db.get(GlobalConfig, key):
-                if key == "check_interval":
-                    default_val = "60"
-                elif key == "max_items_per_message":
-                    default_val = "100"
-                elif key == "run_on_startup":
-                    default_val = "false"
-                elif key == "language":
-                    default_val = "en"
-                else:
-                    default_val = ""
+        keys_and_defaults = {
+            "telegram_token": "",
+            "chat_id": "",
+            "check_interval": "60",
+            "max_items_per_message": "100",
+            "silent_mode_start": "",
+            "silent_mode_end": "",
+            "run_on_startup": "false",
+            "language": "en",
+            "openrouter_api_key": "",
+            "openrouter_model": "qwen/qwen3.6-35b-a3b",
+            "sync_history_enabled": "true"
+        }
+        for key, default_val in keys_and_defaults.items():
+            row = db.get(GlobalConfig, key)
+            if not row:
                 db.add(GlobalConfig(key=key, value=default_val))
+            else:
+                if key == "openrouter_model" and row.value in ("meta-llama/llama-3-8b-instruct", "qwen/qwen-3.6-35b-a3b"):
+                    row.value = "qwen/qwen3.6-35b-a3b"
         db.commit()
+    except Exception as exc:
+        import logging
+        logging.getLogger("rsstracker.models").error("Error in init_db seeding: %s", exc)
     finally:
         db.close()
-
